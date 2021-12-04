@@ -53,7 +53,7 @@ impl Generator {
     /// ```no_run
     /// # use virtue::prelude::*;
     /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
-    /// generator.impl_for_with_lifetime("Foo", &["a", "b"]);
+    /// generator.impl_for_with_lifetimes("Foo", &["a", "b"]);
     ///
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }

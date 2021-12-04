@@ -1,7 +1,12 @@
 [package]
 name = "virtue"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = "A sinless derive macro helper"
+license-file = "LICENSE.md"
+documentation = "https://docs.rs/virtue"
+repository = "https://github.com/bincode-org/virtue"
+readme = "README.md"
 
 [dependencies]
 

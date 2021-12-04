@@ -469,20 +469,37 @@ impl UnnamedField {
     }
 }
 
+/// Reference to an enum variant's field. Either by index or by ident.
+///
+/// ```
+/// enum Foo {
+///     Bar(u32), // will be IdentOrIndex::Index { index: 0, .. }
+///     Baz {
+///         a: u32, // will be IdentOrIndex::Ident { ident: "a", .. }
+///     },
+/// }
 #[derive(Debug)]
 pub enum IdentOrIndex<'a> {
+    /// The variant is a named field
     Ident {
+        /// The name of the field
         ident: &'a Ident,
+        /// The attributes of the field
         attributes: &'a Vec<Attribute>,
     },
+    /// The variant is an unnamed field
     Index {
+        /// The field index
         index: usize,
+        /// The span of the field type
         span: Span,
+        /// The attributes of this field
         attributes: &'a Vec<Attribute>,
     },
 }
 
 impl<'a> IdentOrIndex<'a> {
+    /// Get the ident. Will panic if this is an `IdentOrIndex::Index`
     pub fn unwrap_ident(&self) -> &'a Ident {
         match self {
             Self::Ident { ident, .. } => ident,
@@ -490,6 +507,7 @@ impl<'a> IdentOrIndex<'a> {
         }
     }
 
+    /// Convert this ident into a TokenTree. If this is an `Index`, will return `prefix + index` instead.
     pub fn to_token_tree_with_prefix(&self, prefix: &str) -> TokenTree {
         TokenTree::Ident(match self {
             IdentOrIndex::Ident { ident, .. } => (*ident).clone(),
@@ -499,6 +517,8 @@ impl<'a> IdentOrIndex<'a> {
             }
         })
     }
+
+    /// Return either the index or the ident of this field with a fixed prefix. The prefix will always be added.
     pub fn to_string_with_prefix(&self, prefix: &str) -> String {
         match self {
             IdentOrIndex::Ident { ident, .. } => ident.to_string(),
@@ -508,6 +528,7 @@ impl<'a> IdentOrIndex<'a> {
         }
     }
 
+    /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
     pub fn has_field_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
         let attributes = match self {
             Self::Ident { attributes, .. } => attributes,

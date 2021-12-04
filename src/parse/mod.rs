@@ -10,7 +10,7 @@ mod utils;
 mod visibility;
 
 pub use self::attributes::{Attribute, AttributeLocation, FromAttribute};
-pub use self::body::{EnumBody, EnumVariant, Fields, StructBody, UnnamedField};
+pub use self::body::{EnumBody, EnumVariant, Fields, IdentOrIndex, StructBody, UnnamedField};
 pub(crate) use self::data_type::DataType;
 pub use self::generics::{Generic, GenericConstraints, Generics, Lifetime, SimpleGeneric};
 pub use self::visibility::Visibility;
