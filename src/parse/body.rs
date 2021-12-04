@@ -1,5 +1,5 @@
 use super::attributes::AttributeLocation;
-use super::{utils::*, Attribute, Visibility};
+use super::{utils::*, Attribute, FromAttribute, Visibility};
 use crate::prelude::{Delimiter, Ident, Literal, Span, TokenTree};
 use crate::{Error, Result};
 use std::iter::Peekable;
@@ -506,6 +506,21 @@ impl<'a> IdentOrIndex<'a> {
                 format!("{}{}", prefix, index)
             }
         }
+    }
+
+    pub fn has_field_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
+        let attributes = match self {
+            Self::Ident { attributes, .. } => attributes,
+            Self::Index { attributes, .. } => attributes,
+        };
+        for attribute in attributes.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens) {
+                if attribute == attrib {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 

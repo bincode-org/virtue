@@ -80,7 +80,7 @@ pub use self::error::Error;
 /// Useful includes
 pub mod prelude {
     pub use crate::generate::FnSelfArg;
-    pub use crate::parse::{Body, Parse};
+    pub use crate::parse::{Body, FromAttribute, Parse};
     pub use crate::Result;
     pub use proc_macro2::*;
 }
@@ -90,7 +90,7 @@ pub mod prelude {
     extern crate proc_macro;
 
     pub use crate::generate::FnSelfArg;
-    pub use crate::parse::{Body, Parse};
+    pub use crate::parse::{Body, FromAttribute, Parse};
     pub use crate::Result;
     pub use proc_macro::*;
 }

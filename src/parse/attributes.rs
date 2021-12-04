@@ -95,3 +95,12 @@ fn test_attributes_try_take() {
         x => panic!("Expected ident, found {:?}", x),
     }
 }
+
+/// Helper trait for functions like:
+/// - [`IdentOrIndex::has_field_attribute`]
+///
+/// This can be implemented on your own type to make parsing easier.
+pub trait FromAttribute: Sized {
+    /// Try to parse the given group into your own type. Return `None` if the parsing failed or if the attribute was not this type.
+    fn parse(group: &Group) -> Option<Self>;
+}
