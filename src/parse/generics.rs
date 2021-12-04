@@ -3,25 +3,43 @@ use crate::generate::StreamBuilder;
 use crate::prelude::{Ident, TokenTree};
 use crate::{Error, Result};
 use std::iter::Peekable;
+use std::ops::{Deref, DerefMut};
 
-#[derive(Debug)]
-pub struct Generics {
-    generics: Vec<Generic>,
-}
+/// A generic parameter for a struct or enum.
+///
+/// ```
+/// use std::marker::PhantomData;
+/// use std::fmt::Display;
+///
+/// // Generic will be `Generic::Generic("F")`
+/// struct Foo<F> {
+///     f: PhantomData<F>
+/// }
+/// // Generics will be `Generic::Generic("F: Display")`
+/// struct Bar<F: Display> {
+///     f: PhantomData<F>
+/// }
+/// // Generics will be `[Generic::Lifetime("a"), Generic::Generic("F: Display")]`
+/// struct Baz<'a, F> {
+///     f: PhantomData<&'a F>
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct Generics(pub Vec<Generic>);
 
 impl Generics {
-    pub fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Option<Self>> {
+    pub(crate) fn try_take(
+        input: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    ) -> Result<Option<Generics>> {
         let maybe_punct = input.peek();
         if let Some(TokenTree::Punct(punct)) = maybe_punct {
             if punct.as_char() == '<' {
                 let punct = assume_punct(input.next(), '<');
-                let mut result = Generics {
-                    generics: Vec::new(),
-                };
+                let mut result = Generics(Vec::new());
                 loop {
                     match input.peek() {
                         Some(TokenTree::Punct(punct)) if punct.as_char() == '\'' => {
-                            result.generics.push(Lifetime::take(input)?.into());
+                            result.push(Lifetime::take(input)?.into());
                             consume_punct_if(input, ',');
                         }
                         Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
@@ -29,11 +47,11 @@ impl Generics {
                             break;
                         }
                         Some(TokenTree::Ident(ident)) if ident_eq(ident, "const") => {
-                            result.generics.push(ConstGeneric::take(input)?.into());
+                            result.push(ConstGeneric::take(input)?.into());
                             consume_punct_if(input, ',');
                         }
                         Some(TokenTree::Ident(_)) => {
-                            result.generics.push(SimpleGeneric::take(input)?.into());
+                            result.push(SimpleGeneric::take(input)?.into());
                             consume_punct_if(input, ',');
                         }
                         x => {
@@ -50,15 +68,16 @@ impl Generics {
         Ok(None)
     }
 
+    /// Returns `true` if any of the generics is a [`Generic::Lifetime`]
     pub fn has_lifetime(&self) -> bool {
-        self.generics.iter().any(|lt| lt.is_lifetime())
+        self.iter().any(|lt| lt.is_lifetime())
     }
 
-    pub fn impl_generics(&self) -> StreamBuilder {
+    pub(crate) fn impl_generics(&self) -> StreamBuilder {
         let mut result = StreamBuilder::new();
         result.punct('<');
 
-        for (idx, generic) in self.generics.iter().enumerate() {
+        for (idx, generic) in self.iter().enumerate() {
             if idx > 0 {
                 result.punct(',');
             }
@@ -72,7 +91,7 @@ impl Generics {
     }
 
     #[deprecated(note = "Should take a list of lifetimes")]
-    pub fn impl_generics_with_additional_lifetime(&self, lifetime: &str) -> StreamBuilder {
+    pub(crate) fn impl_generics_with_additional_lifetime(&self, lifetime: &str) -> StreamBuilder {
         assert!(self.has_lifetime());
 
         let mut result = StreamBuilder::new();
@@ -80,18 +99,13 @@ impl Generics {
         result.lifetime_str(lifetime);
 
         if self.has_lifetime() {
-            for (idx, lt) in self
-                .generics
-                .iter()
-                .filter_map(|lt| lt.as_lifetime())
-                .enumerate()
-            {
+            for (idx, lt) in self.iter().filter_map(|lt| lt.as_lifetime()).enumerate() {
                 result.punct(if idx == 0 { ':' } else { '+' });
                 result.lifetime(lt.ident.clone());
             }
         }
 
-        for generic in &self.generics {
+        for generic in self.iter() {
             result.punct(',');
             generic.append_to_result_with_constraints(&mut result);
         }
@@ -101,11 +115,11 @@ impl Generics {
         result
     }
 
-    pub fn type_generics(&self) -> StreamBuilder {
+    pub(crate) fn type_generics(&self) -> StreamBuilder {
         let mut result = StreamBuilder::new();
         result.punct('<');
 
-        for (idx, generic) in self.generics.iter().enumerate() {
+        for (idx, generic) in self.iter().enumerate() {
             if idx > 0 {
                 result.punct(',');
             }
@@ -121,12 +135,50 @@ impl Generics {
     }
 }
 
-#[derive(Debug)]
+impl Deref for Generics {
+    type Target = Vec<Generic>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Generics {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// A single generic argument on a type
+#[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
 #[non_exhaustive]
-enum Generic {
+pub enum Generic {
+    /// A lifetime generic
+    ///
+    /// ```
+    /// # use std::marker::PhantomData;
+    /// struct Foo<'a> { // will be Generic::Lifetime("a")
+    /// #   a: PhantomData<&'a ()>,
+    /// }
+    /// ```
     Lifetime(Lifetime),
+    /// A simple generic
+    ///
+    /// ```
+    /// # use std::marker::PhantomData;
+    /// struct Foo<F> { // will be Generic::Generic("F")
+    /// #   a: PhantomData<F>,
+    /// }
+    /// ```
     Generic(SimpleGeneric),
+    /// A const generic
+    ///
+    /// ```
+    /// struct Foo<const N: usize> { // will be Generic::Const("N")
+    /// #   a: [u8; N],
+    /// }
+    /// ```
     Const(ConstGeneric),
 }
 
@@ -219,18 +271,18 @@ fn test_generics_try_take() {
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let generics = Generics::try_take(stream).unwrap().unwrap();
-    assert_eq!(generics.generics.len(), 2);
-    assert_eq!(generics.generics[0].ident(), "a");
-    assert_eq!(generics.generics[1].ident(), "T");
+    assert_eq!(generics.len(), 2);
+    assert_eq!(generics[0].ident(), "a");
+    assert_eq!(generics[1].ident(), "T");
 
     let stream = &mut token_stream("struct Foo<A, B>()");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let generics = Generics::try_take(stream).unwrap().unwrap();
-    assert_eq!(generics.generics.len(), 2);
-    assert_eq!(generics.generics[0].ident(), "A");
-    assert_eq!(generics.generics[1].ident(), "B");
+    assert_eq!(generics.len(), 2);
+    assert_eq!(generics[0].ident(), "A");
+    assert_eq!(generics[1].ident(), "B");
 
     let stream = &mut token_stream("struct Foo<'a, T: Display>()");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
@@ -238,18 +290,18 @@ fn test_generics_try_take() {
     assert_eq!(ident, "Foo");
     let generics = Generics::try_take(stream).unwrap().unwrap();
     dbg!(&generics);
-    assert_eq!(generics.generics.len(), 2);
-    assert_eq!(generics.generics[0].ident(), "a");
-    assert_eq!(generics.generics[1].ident(), "T");
+    assert_eq!(generics.len(), 2);
+    assert_eq!(generics[0].ident(), "a");
+    assert_eq!(generics[1].ident(), "T");
 
     let stream = &mut token_stream("struct Foo<'a, T: for<'a> Bar<'a> + 'static>()");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     dbg!(&generics);
-    assert_eq!(generics.generics.len(), 2);
-    assert_eq!(generics.generics[0].ident(), "a");
-    assert_eq!(generics.generics[1].ident(), "T");
+    assert_eq!(generics.len(), 2);
+    assert_eq!(generics[0].ident(), "a");
+    assert_eq!(generics[1].ident(), "T");
 
     let stream = &mut token_stream(
         "struct Baz<T: for<'a> Bar<'a, for<'b> Bar<'b, for<'c> Bar<'c, u32>>>> {}",
@@ -259,8 +311,8 @@ fn test_generics_try_take() {
     assert_eq!(ident, "Baz");
     let generics = Generics::try_take(stream).unwrap().unwrap();
     dbg!(&generics);
-    assert_eq!(generics.generics.len(), 1);
-    assert_eq!(generics.generics[0].ident(), "T");
+    assert_eq!(generics.len(), 1);
+    assert_eq!(generics[0].ident(), "T");
 
     let stream = &mut token_stream("struct Baz<()> {}");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
@@ -276,19 +328,20 @@ fn test_generics_try_take() {
     assert_eq!(ident, "Bar");
     let generics = Generics::try_take(stream).unwrap().unwrap();
     dbg!(&generics);
-    assert_eq!(generics.generics.len(), 2);
-    assert_eq!(generics.generics[0].ident(), "A");
-    assert_eq!(generics.generics[1].ident(), "B");
+    assert_eq!(generics.len(), 2);
+    assert_eq!(generics[0].ident(), "A");
+    assert_eq!(generics[1].ident(), "B");
 }
 
-#[derive(Debug)]
+/// a lifetime generic parameter, e.g. `struct Foo<'a> { ... }`
+#[derive(Debug, Clone)]
 pub struct Lifetime {
     ident: Ident,
     constraint: Vec<TokenTree>,
 }
 
 impl Lifetime {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         let start = assume_punct(input.next(), '\'');
         let ident = match input.peek() {
             Some(TokenTree::Ident(_)) => assume_ident(input.next()),
@@ -333,14 +386,15 @@ fn test_lifetime_take() {
     assert!(stream.next().is_none());
 }
 
-#[derive(Debug)]
+/// a simple generic parameter, e.g. `struct Foo<F> { .. }`
+#[derive(Debug, Clone)]
 pub struct SimpleGeneric {
     ident: Ident,
     constraints: Vec<TokenTree>,
 }
 
 impl SimpleGeneric {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         let ident = assume_ident(input.next());
         let mut constraints = Vec::new();
         if let Some(TokenTree::Punct(punct)) = input.peek() {
@@ -353,7 +407,8 @@ impl SimpleGeneric {
     }
 }
 
-#[derive(Debug)]
+/// a const generic parameter, e.g. `struct Foo<const N: usize> { .. }`
+#[derive(Debug, Clone)]
 pub struct ConstGeneric {
     const_token: Ident,
     ident: Ident,
@@ -379,13 +434,26 @@ impl ConstGeneric {
     }
 }
 
-#[derive(Debug)]
+/// Constraints on generic types.
+///
+/// ```
+/// # use std::marker::PhantomData;
+/// # use std::fmt::Display;
+///
+/// struct Foo<F>
+///     where F: Display // These are `GenericConstraints`
+/// {
+///     f: PhantomData<F>
+/// }
+#[derive(Debug, Clone)]
 pub struct GenericConstraints {
     constraints: Vec<TokenTree>,
 }
 
 impl GenericConstraints {
-    pub fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Option<Self>> {
+    pub(crate) fn try_take(
+        input: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    ) -> Result<Option<Self>> {
         match input.peek() {
             Some(TokenTree::Ident(ident)) => {
                 if !ident_eq(ident, "where") {
@@ -401,7 +469,7 @@ impl GenericConstraints {
         Ok(Some(Self { constraints }))
     }
 
-    pub fn where_clause(&self) -> StreamBuilder {
+    pub(crate) fn where_clause(&self) -> StreamBuilder {
         let mut result = StreamBuilder::new();
         result.ident_str("where");
         result.extend(self.constraints.clone());
@@ -445,8 +513,8 @@ fn test_generic_constraints_try_take() {
     assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Test");
     let constraints = Generics::try_take(stream).unwrap().unwrap();
-    assert_eq!(constraints.generics.len(), 1);
-    assert_eq!(constraints.generics[0].ident(), "T");
+    assert_eq!(constraints.len(), 1);
+    assert_eq!(constraints[0].ident(), "T");
     let body = StructBody::take(stream).unwrap();
     assert_eq!(body.fields.len(), 0);
 }

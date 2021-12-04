@@ -1,19 +1,18 @@
 use super::attributes::AttributeLocation;
-use super::{utils::*,
-    Attribute, FieldAttribute,
-    Visibility,
-};
+use super::{utils::*, Attribute, Visibility};
 use crate::prelude::{Delimiter, Ident, Literal, Span, TokenTree};
 use crate::{Error, Result};
 use std::iter::Peekable;
 
+/// The body of a struct
 #[derive(Debug)]
 pub struct StructBody {
+    /// The fields of this struct
     pub fields: Fields,
 }
 
 impl StructBody {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         match input.peek() {
             Some(TokenTree::Group(_)) => {}
             Some(TokenTree::Punct(p)) if p.as_char() == ';' => {
@@ -113,13 +112,15 @@ fn test_struct_body_take() {
     assert_eq!(body.fields.len(), 0);
 }
 
+/// The body of an enum
 #[derive(Debug)]
 pub struct EnumBody {
+    /// The enum's variants
     pub variants: Vec<EnumVariant>,
 }
 
 impl EnumBody {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         match input.peek() {
             Some(TokenTree::Group(_)) => {}
             Some(TokenTree::Punct(p)) if p.as_char() == ';' => {
@@ -228,19 +229,31 @@ fn test_enum_body_take() {
     assert_eq!(field.type_string(), "u128");
 }
 
+/// A variant of an enum
 #[derive(Debug)]
 pub struct EnumVariant {
+    /// The name of the variant
     pub name: Ident,
+    /// The field of the variant. See [`Fields`] for more info
     pub fields: Fields,
+    /// The attributes of this variant
     pub attributes: Vec<Attribute>,
 }
 
 impl EnumVariant {
+    /// Returns `true` if the variant has a fixed value.
+    ///
+    /// ```
+    /// enum Foo {
+    ///     Bar = 0, // .has_fixed_value(): true
+    ///     Baz, // .has_fixed_value(): false
+    /// }
     pub fn has_fixed_value(&self) -> bool {
         matches!(&self.fields, Fields::Integer(_))
     }
 }
 
+/// The different field types an enum variant can have
 #[derive(Debug)]
 pub enum Fields {
     /// Empty variant.
@@ -284,6 +297,14 @@ pub enum Fields {
 }
 
 impl Fields {
+    /// Returns a list of names for the variant.
+    ///
+    /// ```
+    /// enum Foo {
+    ///     A, // will return an empty vec
+    ///     C(u32, u32), // will return `vec[Index { index: 0 }, Index { index: 1 }]`
+    ///     D { a: u32, b: u32 }, // will return `vec[Ident { ident: "a" }, Ident { ident: "b" }]`
+    /// }
     pub fn names(&self) -> Vec<IdentOrIndex> {
         match self {
             Self::Tuple(fields) => fields
@@ -306,6 +327,15 @@ impl Fields {
         }
     }
 
+    /// Return the delimiter of the group for this variant
+    ///
+    /// ```
+    /// enum Foo {
+    ///     A, // will return `None`
+    ///     C(u32, u32), // will return `Some(Delimiter::Paranthesis)`
+    ///     D { a: u32, b: u32 }, // will return `Some(Delimiter::Brace)`
+    /// }
+    /// ```
     pub fn delimiter(&self) -> Option<Delimiter> {
         match self {
             Self::Tuple(_) => Some(Delimiter::Parenthesis),
@@ -340,15 +370,19 @@ impl Fields {
     }
 }
 
+/// An unnamed field
 #[derive(Debug)]
 pub struct UnnamedField {
+    /// The visibility of the field
     pub vis: Visibility,
+    /// The type of the field
     pub r#type: Vec<TokenTree>,
+    /// The attributes of the field
     pub attributes: Vec<Attribute>,
 }
 
 impl UnnamedField {
-    pub fn parse_with_name(
+    pub(crate) fn parse_with_name(
         input: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<Vec<(Ident, Self)>> {
         let mut result = Vec::new();
@@ -386,7 +420,9 @@ impl UnnamedField {
         Ok(result)
     }
 
-    pub fn parse(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Vec<Self>> {
+    pub(crate) fn parse(
+        input: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    ) -> Result<Vec<Self>> {
         let mut result = Vec::new();
         while input.peek().is_some() {
             let attributes = Attribute::try_take(AttributeLocation::Field, input)?;
@@ -408,6 +444,11 @@ impl UnnamedField {
         self.r#type.iter().map(|t| t.to_string()).collect()
     }
 
+    /// Return the span of [`type`].
+    ///
+    /// **note**: Until <https://github.com/rust-lang/rust/issues/54725> is stable, this will return the first span of the type instead
+    ///
+    /// [`type`]: #structfield.type
     pub fn span(&self) -> Span {
         // BlockedTODO: https://github.com/rust-lang/rust/issues/54725
         // Span::join is unstable
@@ -465,20 +506,6 @@ impl<'a> IdentOrIndex<'a> {
                 format!("{}{}", prefix, index)
             }
         }
-    }
-
-    pub fn has_field_attribute(&self, attribute: FieldAttribute) -> bool {
-        let attributes = match self {
-            IdentOrIndex::Ident { attributes, .. } => attributes,
-            IdentOrIndex::Index { attributes, .. } => attributes,
-        };
-        attributes.iter().any(|a| {
-            if let Attribute::Field(field_attribute) = a {
-                field_attribute == &attribute
-            } else {
-                false
-            }
-        })
     }
 }
 

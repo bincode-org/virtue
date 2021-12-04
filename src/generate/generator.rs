@@ -5,8 +5,10 @@ use crate::prelude::{Ident, TokenStream};
 
 #[must_use]
 /// The generator is used to generate code.
-/// 
+///
 /// Often you will want to use [`impl_for`] to generate an `impl <trait_name> for <target_name()>`.
+///
+/// [`impl_for`]: #method.impl_for
 pub struct Generator {
     pub(crate) name: Ident,
     pub(crate) generics: Option<Generics>,
@@ -48,8 +50,8 @@ impl Generator {
     }
 
     /// Consume the contents of this generator. This *must* be called, or else the generator will panic on drop.
-    pub fn take_stream(mut self) -> TokenStream {
-        std::mem::take(&mut self.stream).stream
+    pub fn finish(mut self) -> crate::prelude::Result<TokenStream> {
+        Ok(std::mem::take(&mut self.stream).stream)
     }
 }
 

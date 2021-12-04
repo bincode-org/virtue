@@ -1,16 +1,20 @@
+use super::utils::*;
 use crate::prelude::TokenTree;
 use crate::Result;
 use std::iter::Peekable;
-use super::utils::*;
 
+/// The visibility of a struct, enum, field, etc
 #[derive(Debug, PartialEq, Clone)]
 pub enum Visibility {
+    /// Default visibility. Most items are private by default.
     Default,
+
+    /// Public visibility
     Pub,
 }
 
 impl Visibility {
-    pub fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         if let Some(TokenTree::Ident(ident)) = input.peek() {
             if ident_eq(ident, "pub") {
                 // Consume this token

@@ -1,15 +1,48 @@
-use crate::{generate::StreamBuilder, prelude::*};
+use crate::{
+    generate::{PushParseError, StreamBuilder},
+    prelude::*,
+};
 use std::fmt;
 
+/// Errors that can occur while parsing or generator your derive macro.
 #[derive(Debug)]
 pub enum Error {
+    /// The data type at `Span` is unknown. This will be called when [`Parse::new`] is called on anything that is not a `struct` or `enum`.
+    ///
+    /// [`Parse::new`]: enum.Parse.html#method.new
     UnknownDataType(Span),
-    InvalidRustSyntax { span: Span, expected: String },
+
+    /// The rust syntax is invalid. This can be returned while parsing the Enum or Struct.
+    ///
+    /// This error is assumed to not appear as rustc will do syntax checking before virtue gets access to the [`TokenStream`].
+    /// However this error could still be returned.
+    InvalidRustSyntax {
+        /// The span at which the invalid syntax is found
+        span: Span,
+        /// The expected rust syntax when this parsing occured
+        expected: String,
+    },
+
+    /// Expected an ident at the given span.
     ExpectedIdent(Span),
+
+    /// Failed to parse the code passed to [`StreamBuilder::push_parsed`].
+    ///
+    /// [`StreamBuilder::push_parsed`]: struct.StreamBuilder.html#method.push_parsed
+    PushParse(PushParseError),
+}
+
+impl From<PushParseError> for Error {
+    fn from(e: PushParseError) -> Self {
+        Self::PushParse(e)
+    }
 }
 
 impl Error {
-    pub fn wrong_token<T>(token: Option<&TokenTree>, expected: &str) -> std::result::Result<T, Self> {
+    pub(crate) fn wrong_token<T>(
+        token: Option<&TokenTree>,
+        expected: &str,
+    ) -> std::result::Result<T, Self> {
         Err(Self::InvalidRustSyntax {
             span: token.map(|t| t.span()).unwrap_or_else(Span::call_site),
             expected: format!("{}, got {:?}", expected, token),
@@ -39,20 +72,30 @@ impl fmt::Display for Error {
                 write!(fmt, "Invalid rust syntax, expected {}", expected)
             }
             Self::ExpectedIdent(_) => write!(fmt, "Expected ident"),
+            Self::PushParse(e) => write!(
+                fmt,
+                "Invalid code passed to `StreamBuilder::push_parsed`: {:?}",
+                e
+            ),
         }
     }
 }
 
 impl Error {
+    /// Turn this error into a [`TokenStream`] so it shows up as a [`compile_error`] for the user.
     pub fn into_token_stream(self) -> TokenStream {
         let maybe_span = match &self {
-            Error::UnknownDataType(span)
-            | Error::ExpectedIdent(span)
-            | Error::InvalidRustSyntax { span, .. } => Some(*span),
+            Self::UnknownDataType(span)
+            | Self::ExpectedIdent(span)
+            | Self::InvalidRustSyntax { span, .. } => Some(*span),
+            // PushParseError.error technically has a .span(), but this will be the span in the users derive impl
+            // so we pretend to not have a span
+            Self::PushParse(_) => None,
         };
         self.throw_with_span(maybe_span.unwrap_or_else(Span::call_site))
     }
 
+    /// Turn this error into a [`TokenStream`] so it shows up as a [`compile_error`] for the user. The error will be shown at the given `span`.
     pub fn throw_with_span(self, span: Span) -> TokenStream {
         // compile_error!($message)
         let mut builder = StreamBuilder::new();

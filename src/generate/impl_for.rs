@@ -67,15 +67,15 @@ impl<'a> ImplFor<'a> {
     }
 
     /// Add a function to the trait implementation.
-    /// 
+    ///
     /// `generator.impl_for("Foo").generate_fn("bar")` results in code like:
-    /// 
+    ///
     /// ```ignore
     /// impl Foo for <struct or enum> {
     ///     fn bar() {}
     /// }
     /// ```
-    /// 
+    ///
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
     pub fn generate_fn<'b>(&'b mut self, name: &str) -> FnBuilder<'a, 'b> {
         FnBuilder::new(self, name)

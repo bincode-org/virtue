@@ -3,27 +3,45 @@ use crate::prelude::{Delimiter, Group, Punct, TokenTree};
 use crate::{Error, Result};
 use std::iter::Peekable;
 
+/// An attribute for the given struct, enum, field, etc
 #[derive(Debug)]
-pub enum Attribute {
-    Field(FieldAttribute),
-    Unknown { punct: Punct, tokens: Option<Group> },
-}
-#[derive(Debug, PartialEq)]
-pub enum FieldAttribute {
-    /// The field is a serde type and should implement Encode/Decode through a wrapper
-    WithSerde,
+#[non_exhaustive]
+pub struct Attribute {
+    /// The location this attribute was parsed at
+    pub location: AttributeLocation,
+    /// The punct token of the attribute. This will always be `Punct('#')`
+    pub punct: Punct,
+    /// The group of tokens of the attribute. You can parse this to get your custom attributes.
+    pub tokens: Group,
 }
 
+/// The location an attribute can be found at
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
+#[non_exhaustive]
 pub enum AttributeLocation {
+    /// The attribute is on a container, which will be either a `struct` or an `enum`
     Container,
+    /// The attribute is on an enum variant
     Variant,
+    /// The attribute is on a field, which can either be a struct field or an enum variant field
+    /// ```ignore
+    /// struct Foo {
+    ///     #[attr] // here
+    ///     pub a: u8
+    /// }
+    /// struct Bar {
+    ///     Baz {
+    ///         #[attr] // or here
+    ///         a: u8
+    ///     }
+    /// }
+    /// ```
     Field,
 }
 
 impl Attribute {
-    pub fn try_take(
-        loc: AttributeLocation,
+    pub(crate) fn try_take(
+        location: AttributeLocation,
         input: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<Vec<Self>> {
         let mut result = Vec::new();
@@ -32,30 +50,10 @@ impl Attribute {
             match input.peek() {
                 Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Bracket => {
                     let group = assume_group(input.next());
-                    let stream = &mut group.stream().into_iter().peekable();
-                    if let Some(TokenTree::Ident(attribute_ident)) = stream.peek() {
-                        if ident_eq(attribute_ident, "bincode") {
-                            assume_ident(stream.next());
-                            match stream.next() {
-                                Some(TokenTree::Group(group)) => {
-                                    result.push(Self::parse_bincode_attribute(
-                                        loc,
-                                        &mut group.stream().into_iter().peekable(),
-                                    )?);
-                                }
-                                token => {
-                                    return Error::wrong_token(
-                                        token.as_ref(),
-                                        "Bracketed group of attributes",
-                                    )
-                                }
-                            }
-                            continue;
-                        }
-                    }
-                    result.push(Attribute::Unknown {
+                    result.push(Attribute {
+                        location,
                         punct,
-                        tokens: Some(group),
+                        tokens: group,
                     });
                 }
                 Some(TokenTree::Group(g)) => {
@@ -66,37 +64,12 @@ impl Attribute {
                 }
                 Some(TokenTree::Punct(p)) if p.as_char() == '#' => {
                     // sometimes with empty lines of doc comments, we get two #'s in a row
-                    // add an empty attributes and continue to the next loop
-                    result.push(Attribute::Unknown {
-                        punct: assume_punct(input.next(), '#'),
-                        tokens: None,
-                    })
+                    // Just ignore this
                 }
                 token => return Error::wrong_token(token, "[] group or next # attribute"),
             }
         }
         Ok(result)
-    }
-
-    fn parse_bincode_attribute(
-        loc: AttributeLocation,
-        stream: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<Self> {
-        match (stream.next(), loc) {
-            (Some(TokenTree::Ident(ident)), AttributeLocation::Field)
-                if ident_eq(&ident, "with_serde") =>
-            {
-                Ok(Self::Field(FieldAttribute::WithSerde))
-            }
-            (token @ Some(TokenTree::Ident(_)), AttributeLocation::Field) => {
-                Error::wrong_token(token.as_ref(), "one of: `with_serde`")
-            }
-            (token @ Some(TokenTree::Ident(_)), loc) => Error::wrong_token(
-                token.as_ref(),
-                &format!("{:?} attributes not supported", loc),
-            ),
-            (token, _) => Error::wrong_token(token.as_ref(), "ident"),
-        }
     }
 }
 

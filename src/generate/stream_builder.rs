@@ -71,7 +71,9 @@ impl StreamBuilder {
 
     /// Add a single punctuation to the stream. Puncts are single-character tokens like `.`, `<`, `#`, etc
     ///
-    /// Note that this should not be used for multi-punct constructions like `::` or `->`. For that use [puncts] instead.
+    /// Note that this should not be used for multi-punct constructions like `::` or `->`. For that use [`puncts`] instead.
+    ///
+    /// [`puncts`]: #method.puncts
     pub fn punct(&mut self, p: char) {
         self.stream
             .extend([TokenTree::Punct(Punct::new(p, Spacing::Alone))]);
@@ -80,7 +82,7 @@ impl StreamBuilder {
     /// Add multiple punctuations to the stream. Multi punct tokens are e.g. `::`, `->` and `=>`.
     ///
     /// Note that this is the only way to add multi punct tokens.
-    /// If you were to use [punct] to insert `->` it would be inserted as `-` and then `>`, and not form a single token. Rust would interpret this as a "minus sign and then a greater than sign", not as a single arrow.
+    /// If you were to use [`Punct`] to insert `->` it would be inserted as `-` and then `>`, and not form a single token. Rust would interpret this as a "minus sign and then a greater than sign", not as a single arrow.
     pub fn puncts(&mut self, puncts: &str) {
         self.stream.extend(
             puncts
@@ -143,8 +145,13 @@ impl StreamBuilder {
     }
 }
 
+/// Failed to parse the code passed to [`StreamBuilder::push_parsed`]
+///
+/// [`StreamBuilder::push_parsed`]: struct.StreamBuilder.html#method.push_parsed
 #[derive(Debug)]
 pub struct PushParseError {
+    /// The parsing error
     pub error: LexError,
+    /// The code that was being parsed
     pub code: String,
 }

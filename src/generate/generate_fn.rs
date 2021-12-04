@@ -93,6 +93,9 @@ impl<'a, 'b> FnBuilder<'a, 'b> {
     /// builder.body(|b| {
     ///     b.push_parsed("println!(\"hello world\");");
     /// });
+    /// // fn foo() {
+    /// //     println!("Hello world");
+    /// // }
     /// ```
     pub fn body(self, body_builder: impl FnOnce(&mut StreamBuilder)) -> Result<(), PushParseError> {
         let FnBuilder {

@@ -3,13 +3,15 @@ use crate::{Error, Result};
 use std::iter::Peekable;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DataType {
+pub(crate) enum DataType {
     Enum,
     Struct,
 }
 
 impl DataType {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<(Self, Ident)> {
+    pub(crate) fn take(
+        input: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    ) -> Result<(Self, Ident)> {
         if let Some(TokenTree::Ident(_)) = input.peek() {
             let ident = super::utils::assume_ident(input.next());
             let result = match ident.to_string().as_str() {
