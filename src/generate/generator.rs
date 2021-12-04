@@ -40,13 +40,30 @@ impl Generator {
         ImplFor::new(self, trait_name)
     }
 
-    /// Generate an `for <'__de> <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
-    #[deprecated(note = "Should be replace with generic lifetimes")]
-    pub fn impl_for_with_de_lifetime<'a>(
+    /// Generate an `for <..lifetimes> <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
+    ///
+    /// Note:
+    /// - Lifetimes should _not_ have the leading apostrophe.
+    /// - The lifetimes passed to this function will automatically depend on any other lifetime this struct or enum may have. Example:
+    ///   - The struct is `struct Foo<'a> {}`
+    ///   - You call `generator.impl_for_with_lifetime("Bar", &["b"])
+    ///   - The code will be `impl<'a, 'b: 'a> Bar<'b> for Foo<'a> {}`
+    /// - `trait_name` should _not_ have custom lifetimes. These will be added automatically.
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::*;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator.impl_for_with_lifetime("Foo", &["a", "b"]);
+    ///
+    /// // will output:
+    /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
+    /// ```
+    pub fn impl_for_with_lifetimes<'a>(
         &'a mut self,
         trait_name: &str,
+        lifetimes: &[&str],
     ) -> Result<ImplFor<'a>, PushParseError> {
-        ImplFor::new_with_de_lifetime(self, trait_name)
+        ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
     }
 
     /// Consume the contents of this generator. This *must* be called, or else the generator will panic on drop.

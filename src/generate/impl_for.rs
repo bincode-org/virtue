@@ -35,28 +35,29 @@ impl<'a> ImplFor<'a> {
         Ok(Self { generator, group })
     }
 
-    #[deprecated(note = "Should be replace with generic lifetimes")]
-    pub(super) fn new_with_de_lifetime(
+    pub(super) fn new_with_lifetimes(
         generator: &'a mut Generator,
         trait_name: &str,
+        lifetimes: &[&str],
     ) -> Result<Self, PushParseError> {
         let mut builder = StreamBuilder::new();
         builder.ident_str("impl");
 
         if let Some(generics) = &generator.generics {
-            builder.append(generics.impl_generics_with_additional_lifetime("__de"));
+            builder.append(generics.impl_generics_with_additional_lifetimes(lifetimes));
         } else {
-            builder.punct('<');
-            builder.lifetime_str("__de");
-            builder.punct('>');
+            append_lifetimes(&mut builder, lifetimes);
         }
 
         builder.push_parsed(trait_name)?;
+        append_lifetimes(&mut builder, lifetimes);
         builder.ident_str("for");
         builder.ident(generator.name.clone());
+
         if let Some(generics) = &generator.generics {
             builder.append(generics.type_generics());
         }
+
         if let Some(generic_constraints) = &generator.generic_constraints {
             builder.append(generic_constraints.where_clause());
         }
@@ -89,4 +90,12 @@ impl Drop for ImplFor<'_> {
             .stream
             .group(Delimiter::Brace, |builder| builder.append(stream))
     }
+}
+
+fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[&str]) {
+    for (idx, lt) in lifetimes.iter().enumerate() {
+        builder.punct(if idx == 0 { '<' } else { ',' });
+        builder.lifetime_str(lt);
+    }
+    builder.punct('>');
 }

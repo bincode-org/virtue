@@ -90,24 +90,28 @@ impl Generics {
         result
     }
 
-    #[deprecated(note = "Should take a list of lifetimes")]
-    pub(crate) fn impl_generics_with_additional_lifetime(&self, lifetime: &str) -> StreamBuilder {
+    pub(crate) fn impl_generics_with_additional_lifetimes(
+        &self,
+        lifetime: &[&str],
+    ) -> StreamBuilder {
         assert!(self.has_lifetime());
 
         let mut result = StreamBuilder::new();
-        result.punct('<');
-        result.lifetime_str(lifetime);
+        for (idx, lt) in lifetime.iter().enumerate() {
+            result.punct(if idx == 0 { '<' } else { ',' });
+            result.lifetime_str(lt);
 
-        if self.has_lifetime() {
-            for (idx, lt) in self.iter().filter_map(|lt| lt.as_lifetime()).enumerate() {
-                result.punct(if idx == 0 { ':' } else { '+' });
-                result.lifetime(lt.ident.clone());
+            if self.has_lifetime() {
+                for (idx, lt) in self.iter().filter_map(|lt| lt.as_lifetime()).enumerate() {
+                    result.punct(if idx == 0 { ':' } else { '+' });
+                    result.lifetime(lt.ident.clone());
+                }
             }
-        }
 
-        for generic in self.iter() {
-            result.punct(',');
-            generic.append_to_result_with_constraints(&mut result);
+            for generic in self.iter() {
+                result.punct(',');
+                generic.append_to_result_with_constraints(&mut result);
+            }
         }
 
         result.punct('>');
