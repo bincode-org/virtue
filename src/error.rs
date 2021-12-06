@@ -32,7 +32,12 @@ pub enum Error {
     PushParse(PushParseError),
 
     /// A custom error thrown by the developer
-    Custom(String),
+    Custom {
+        /// The error message
+        error: String,
+        /// Optionally the position that the error occurred at
+        span: Option<Span>,
+    },
 }
 
 impl From<PushParseError> for Error {
@@ -44,7 +49,18 @@ impl From<PushParseError> for Error {
 impl Error {
     /// Throw a custom error
     pub fn custom(s: impl Into<String>) -> Result {
-        Err(Self::Custom(s.into()))
+        Err(Self::Custom {
+            error: s.into(),
+            span: None,
+        })
+    }
+
+    /// Throw a custom error at a given location
+    pub fn custom_at(s: impl Into<String>, span: Span) -> Result {
+        Err(Self::Custom {
+            error: s.into(),
+            span: Some(span),
+        })
     }
 
     pub(crate) fn wrong_token<T>(token: Option<&TokenTree>, expected: &str) -> Result<T> {
@@ -82,7 +98,7 @@ impl fmt::Display for Error {
                 "Invalid code passed to `StreamBuilder::push_parsed`: {:?}",
                 e
             ),
-            Self::Custom(s) => write!(fmt, "{}", s),
+            Self::Custom { error, .. } => write!(fmt, "{}", error),
         }
     }
 }
@@ -94,10 +110,10 @@ impl Error {
             Self::UnknownDataType(span)
             | Self::ExpectedIdent(span)
             | Self::InvalidRustSyntax { span, .. } => Some(*span),
+            Self::Custom { span, .. } => *span,
             // PushParseError.error technically has a .span(), but this will be the span in the users derive impl
             // so we pretend to not have a span
             Self::PushParse(_) => None,
-            Self::Custom(_) => None,
         };
         self.throw_with_span(maybe_span.unwrap_or_else(Span::call_site))
     }
