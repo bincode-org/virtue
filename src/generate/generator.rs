@@ -34,14 +34,16 @@ impl Generator {
         &self.name
     }
 
-    /// Generate an `impl <target_name>` implementation. See [Impl] for more information.
+    /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
     pub fn r#impl(&mut self) -> Impl {
         Impl::new(self)
     }
 
-    /// Generate an `impl <target_name>` implementation. See [Impl] for more information.
+    /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
     ///
     /// Alias for [`impl`] which doesn't need a `r#` prefix.
+    ///
+    /// [`impl`]: #method.impl
     pub fn generate_impl(&mut self) -> Impl {
         Impl::new(self)
     }

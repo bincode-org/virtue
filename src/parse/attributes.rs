@@ -97,11 +97,21 @@ fn test_attributes_try_take() {
 }
 
 /// Helper trait for functions like:
-/// - [`IdentOrIndex::has_field_attribute`]
+/// - [`UnnamedField::has_attribute`]
+/// - [`UnnamedField::get_attribute`]
+/// - [`IdentOrIndex::has_attribute`]
+/// - [`IdentOrIndex::get_attribute`]
 ///
 /// This can be implemented on your own type to make parsing easier.
 ///
-/// [`IdentOrIndex::has_field_attribute`]: enum.IdentOrIndex.html#has_field_attribute
+/// Some functions that can make your life easier:
+/// - [`utils::parse_tagged_attribute`] is a helper for parsing attributes in the format of `#[prefix(...)]`
+///
+/// [`IdentOrIndex::has_attribute`]: enum.IdentOrIndex.html#method.has_attribute
+/// [`IdentOrIndex::get_attribute`]: enum.IdentOrIndex.html#method.get_attribute
+/// [`UnnamedField::has_attribute`]: struct.UnnamedField.html#method.has_attribute
+/// [`UnnamedField::get_attribute`]: struct.UnnamedField.html#method.get_attribute
+/// [`utils::parse_tagged_attribute`]: ../utils/fn.parse_tagged_attribute.html
 pub trait FromAttribute: Sized {
     /// Try to parse the given group into your own type. Return `None` if the parsing failed or if the attribute was not this type.
     fn parse(group: &Group) -> Option<Self>;

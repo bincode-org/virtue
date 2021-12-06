@@ -467,6 +467,28 @@ impl UnnamedField {
             None => Span::call_site(),
         }
     }
+
+    /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
+    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
+        for attribute in self.attributes.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens) {
+                if attribute == attrib {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
+    pub fn get_attribute<T: FromAttribute>(&self) -> Option<T> {
+        for attribute in self.attributes.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens) {
+                return Some(attribute);
+            }
+        }
+        None
+    }
 }
 
 /// Reference to an enum variant's field. Either by index or by ident.
@@ -529,7 +551,7 @@ impl<'a> IdentOrIndex<'a> {
     }
 
     /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
-    pub fn has_field_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
+    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
         let attributes = match self {
             Self::Ident { attributes, .. } => attributes,
             Self::Index { attributes, .. } => attributes,
@@ -542,6 +564,20 @@ impl<'a> IdentOrIndex<'a> {
             }
         }
         false
+    }
+
+    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
+    pub fn get_attribute<T: FromAttribute>(&self) -> Option<T> {
+        let attributes = match self {
+            Self::Ident { attributes, .. } => attributes,
+            Self::Index { attributes, .. } => attributes,
+        };
+        for attribute in attributes.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens) {
+                return Some(attribute);
+            }
+        }
+        None
     }
 }
 

@@ -70,6 +70,7 @@ mod error;
 
 pub mod generate;
 pub mod parse;
+pub mod utils;
 
 /// Result alias for virtue's errors
 pub type Result<T = ()> = std::result::Result<T, Error>;
