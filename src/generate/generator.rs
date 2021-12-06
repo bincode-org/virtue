@@ -1,7 +1,6 @@
-use super::stream_builder::PushParseError;
-use super::{ImplFor, StreamBuilder};
+use super::{Impl, ImplFor, StreamBuilder};
 use crate::parse::{GenericConstraints, Generics};
-use crate::prelude::{Ident, TokenStream};
+use crate::prelude::{Ident, Result, TokenStream};
 
 #[must_use]
 /// The generator is used to generate code.
@@ -35,8 +34,20 @@ impl Generator {
         &self.name
     }
 
+    /// Generate an `impl <target_name>` implementation. See [Impl] for more information.
+    pub fn r#impl(&mut self) -> Impl {
+        Impl::new(self)
+    }
+
+    /// Generate an `impl <target_name>` implementation. See [Impl] for more information.
+    ///
+    /// Alias for [`impl`] which doesn't need a `r#` prefix.
+    pub fn generate_impl(&mut self) -> Impl {
+        Impl::new(self)
+    }
+
     /// Generate an `for <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
-    pub fn impl_for<'a>(&'a mut self, trait_name: &str) -> Result<ImplFor<'a>, PushParseError> {
+    pub fn impl_for<'a>(&'a mut self, trait_name: &str) -> Result<ImplFor<'a>> {
         ImplFor::new(self, trait_name)
     }
 
@@ -62,7 +73,7 @@ impl Generator {
         &'a mut self,
         trait_name: &str,
         lifetimes: &[&str],
-    ) -> Result<ImplFor<'a>, PushParseError> {
+    ) -> Result<ImplFor<'a>> {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
     }
 

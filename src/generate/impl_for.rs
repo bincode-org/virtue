@@ -1,5 +1,5 @@
-use super::{stream_builder::PushParseError, FnBuilder, Generator, StreamBuilder};
-use crate::prelude::Delimiter;
+use super::{generate_fn::FnParent, FnBuilder, Generator, StreamBuilder};
+use crate::prelude::{Delimiter, Result};
 
 #[must_use]
 /// A helper struct for implementing a trait for a given struct or enum.
@@ -9,10 +9,7 @@ pub struct ImplFor<'a> {
 }
 
 impl<'a> ImplFor<'a> {
-    pub(super) fn new(
-        generator: &'a mut Generator,
-        trait_name: &str,
-    ) -> Result<Self, PushParseError> {
+    pub(super) fn new(generator: &'a mut Generator, trait_name: &str) -> Result<Self> {
         let mut builder = StreamBuilder::new();
         builder.ident_str("impl");
 
@@ -39,7 +36,7 @@ impl<'a> ImplFor<'a> {
         generator: &'a mut Generator,
         trait_name: &str,
         lifetimes: &[&str],
-    ) -> Result<Self, PushParseError> {
+    ) -> Result<Self> {
         let mut builder = StreamBuilder::new();
         builder.ident_str("impl");
 
@@ -78,8 +75,18 @@ impl<'a> ImplFor<'a> {
     /// ```
     ///
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
-    pub fn generate_fn<'b>(&'b mut self, name: &str) -> FnBuilder<'a, 'b> {
+    pub fn generate_fn<'b>(&'b mut self, name: &'a str) -> FnBuilder<'b, ImplFor<'a>> {
         FnBuilder::new(self, name)
+    }
+}
+
+impl<'a> FnParent for ImplFor<'a> {
+    fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
+        self.group.append(fn_definition);
+        self.group.group(Delimiter::Brace, |body| {
+            *body = fn_body;
+            Ok(())
+        })
     }
 }
 
@@ -88,7 +95,11 @@ impl Drop for ImplFor<'_> {
         let stream = std::mem::take(&mut self.group);
         self.generator
             .stream
-            .group(Delimiter::Brace, |builder| builder.append(stream))
+            .group(Delimiter::Brace, |builder| {
+                builder.append(stream);
+                Ok(())
+            })
+            .unwrap()
     }
 }
 
