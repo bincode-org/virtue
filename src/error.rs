@@ -30,6 +30,9 @@ pub enum Error {
     ///
     /// [`StreamBuilder::push_parsed`]: struct.StreamBuilder.html#method.push_parsed
     PushParse(PushParseError),
+
+    /// A custom error thrown by the developer
+    Custom(String),
 }
 
 impl From<PushParseError> for Error {
@@ -39,10 +42,12 @@ impl From<PushParseError> for Error {
 }
 
 impl Error {
-    pub(crate) fn wrong_token<T>(
-        token: Option<&TokenTree>,
-        expected: &str,
-    ) -> std::result::Result<T, Self> {
+    /// Throw a custom error
+    pub fn custom(s: impl Into<String>) -> Result {
+        Err(Self::Custom(s.into()))
+    }
+
+    pub(crate) fn wrong_token<T>(token: Option<&TokenTree>, expected: &str) -> Result<T> {
         Err(Self::InvalidRustSyntax {
             span: token.map(|t| t.span()).unwrap_or_else(Span::call_site),
             expected: format!("{}, got {:?}", expected, token),
@@ -77,6 +82,7 @@ impl fmt::Display for Error {
                 "Invalid code passed to `StreamBuilder::push_parsed`: {:?}",
                 e
             ),
+            Self::Custom(s) => write!(fmt, "{}", s),
         }
     }
 }
@@ -91,6 +97,7 @@ impl Error {
             // PushParseError.error technically has a .span(), but this will be the span in the users derive impl
             // so we pretend to not have a span
             Self::PushParse(_) => None,
+            Self::Custom(_) => None,
         };
         self.throw_with_span(maybe_span.unwrap_or_else(Span::call_site))
     }
@@ -101,9 +108,12 @@ impl Error {
         let mut builder = StreamBuilder::new();
         builder.ident_str("compile_error");
         builder.punct('!');
-        builder.group(Delimiter::Brace, |b| {
-            b.lit_str(self.to_string());
-        });
+        builder
+            .group(Delimiter::Brace, |b| {
+                b.lit_str(self.to_string());
+                Ok(())
+            })
+            .unwrap();
         builder.set_span_on_all_tokens(span);
         builder.stream
     }

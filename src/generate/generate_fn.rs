@@ -209,11 +209,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
             builder.push_parsed(&return_type)?;
         }
 
-        generate.group.append(builder);
-        generate.group.group(Delimiter::Brace, body_builder);
+        let mut body_stream = StreamBuilder::new();
+        body_builder(&mut body_stream)?;
 
-        Ok(())
+        parent.append(builder, body_stream)
     }
+}
+
+pub trait FnParent {
+    fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result;
 }
 
 /// The `self` argument of a function

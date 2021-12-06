@@ -1,5 +1,6 @@
 use crate::prelude::{
-    Delimiter, Group, Ident, LexError, Literal, Punct, Spacing, Span, TokenStream, TokenTree,
+    Delimiter, Group, Ident, LexError, Literal, Punct, Result, Spacing, Span, TokenStream,
+    TokenTree,
 };
 use std::str::FromStr;
 
@@ -36,7 +37,7 @@ impl StreamBuilder {
     /// Attempt to parse the given string as valid Rust code, and append the parsed result to the internal stream.
     ///
     /// Currently panics if the string could not be parsed as valid Rust code.
-    pub fn push_parsed(&mut self, item: impl AsRef<str>) -> Result<(), PushParseError> {
+    pub fn push_parsed(&mut self, item: impl AsRef<str>) -> Result {
         let tokens = TokenStream::from_str(item.as_ref()).map_err(|e| PushParseError {
             error: e,
             code: item.as_ref().to_string(),
@@ -61,7 +62,10 @@ impl StreamBuilder {
     /// Add a group. A group is any block surrounded by `{ .. }`, `[ .. ]` or `( .. )`.
     ///
     /// `delim` indicates which group it is. The `inner` callback is used to fill the contents of the group.
-    pub fn group<T>(&mut self, delim: Delimiter, inner: impl FnOnce(&mut StreamBuilder) -> T) -> T {
+    pub fn group<FN, T>(&mut self, delim: Delimiter, inner: FN) -> crate::Result<T>
+    where
+        FN: FnOnce(&mut StreamBuilder) -> crate::Result<T>,
+    {
         let mut stream = StreamBuilder::new();
         let result = inner(&mut stream);
         self.stream
