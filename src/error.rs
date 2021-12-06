@@ -48,19 +48,35 @@ impl From<PushParseError> for Error {
 
 impl Error {
     /// Throw a custom error
-    pub fn custom(s: impl Into<String>) -> Result {
-        Err(Self::Custom {
+    pub fn custom(s: impl Into<String>) -> Self {
+        Self::Custom {
             error: s.into(),
             span: None,
-        })
+        }
     }
 
     /// Throw a custom error at a given location
-    pub fn custom_at(s: impl Into<String>, span: Span) -> Result {
-        Err(Self::Custom {
+    pub fn custom_at(s: impl Into<String>, span: Span) -> Self {
+        Self::Custom {
             error: s.into(),
             span: Some(span),
-        })
+        }
+    }
+
+    /// Throw a custom error at a given token
+    pub fn custom_at_token(s: impl Into<String>, token: TokenTree) -> Self {
+        Self::Custom {
+            error: s.into(),
+            span: Some(token.span()),
+        }
+    }
+
+    /// Throw a custom error at a given `Option<TokenTree>`
+    pub fn custom_at_opt_token(s: impl Into<String>, token: Option<TokenTree>) -> Self {
+        Self::Custom {
+            error: s.into(),
+            span: token.map(|t| t.span()),
+        }
     }
 
     pub(crate) fn wrong_token<T>(token: Option<&TokenTree>, expected: &str) -> Result<T> {
