@@ -469,25 +469,29 @@ impl UnnamedField {
     }
 
     /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
-    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
         for attribute in self.attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens) {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
                 if attribute == attrib {
-                    return true;
+                    return Ok(true);
                 }
             }
         }
-        false
+        Ok(false)
     }
 
     /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
-    pub fn get_attribute<T: FromAttribute>(&self) -> Option<T> {
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    pub fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
         for attribute in self.attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens) {
-                return Some(attribute);
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                return Ok(Some(attribute));
             }
         }
-        None
+        Ok(None)
     }
 }
 
@@ -551,33 +555,37 @@ impl<'a> IdentOrIndex<'a> {
     }
 
     /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
-    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> bool {
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
         let attributes = match self {
             Self::Ident { attributes, .. } => attributes,
             Self::Index { attributes, .. } => attributes,
         };
         for attribute in attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens) {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
                 if attribute == attrib {
-                    return true;
+                    return Ok(true);
                 }
             }
         }
-        false
+        Ok(false)
     }
 
     /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
-    pub fn get_attribute<T: FromAttribute>(&self) -> Option<T> {
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    pub fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
         let attributes = match self {
             Self::Ident { attributes, .. } => attributes,
             Self::Index { attributes, .. } => attributes,
         };
         for attribute in attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens) {
-                return Some(attribute);
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                return Ok(Some(attribute));
             }
         }
-        None
+        Ok(None)
     }
 }
 

@@ -113,6 +113,6 @@ fn test_attributes_try_take() {
 /// [`UnnamedField::get_attribute`]: struct.UnnamedField.html#method.get_attribute
 /// [`utils::parse_tagged_attribute`]: ../utils/fn.parse_tagged_attribute.html
 pub trait FromAttribute: Sized {
-    /// Try to parse the given group into your own type. Return `None` if the parsing failed or if the attribute was not this type.
-    fn parse(group: &Group) -> Option<Self>;
+    /// Try to parse the given group into your own type. Return `Ok(None)` if the parsing failed or if the attribute was not this type.
+    fn parse(group: &Group) -> Result<Option<Self>>;
 }
