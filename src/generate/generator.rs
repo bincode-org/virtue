@@ -88,7 +88,7 @@ impl Generator {
 impl Drop for Generator {
     fn drop(&mut self) {
         if !self.stream.stream.is_empty() && !std::thread::panicking() {
-            panic!("Generator dropped but the stream is not empty. Please call `.take_stream()` on the generator");
+            eprintln!("WARNING: Generator dropped but the stream is not empty. Please call `.finish()` on the generator");
         }
     }
 }

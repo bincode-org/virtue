@@ -20,57 +20,62 @@ impl StreamBuilder {
     }
 
     /// Add multiple `TokenTree` items to the stream.
-    pub fn extend(&mut self, item: impl IntoIterator<Item = TokenTree>) {
+    pub fn extend(&mut self, item: impl IntoIterator<Item = TokenTree>) -> &mut Self {
         self.stream.extend(item);
+        self
     }
 
     /// Append another StreamBuilder to the current StreamBuilder.
-    pub fn append(&mut self, builder: StreamBuilder) {
+    pub fn append(&mut self, builder: StreamBuilder) -> &mut Self {
         self.stream.extend(builder.stream);
+        self
     }
 
     /// Push a single token to the stream.
-    pub fn push(&mut self, item: impl Into<TokenTree>) {
+    pub fn push(&mut self, item: impl Into<TokenTree>) -> &mut Self {
         self.stream.extend([item.into()]);
+        self
     }
 
     /// Attempt to parse the given string as valid Rust code, and append the parsed result to the internal stream.
     ///
     /// Currently panics if the string could not be parsed as valid Rust code.
-    pub fn push_parsed(&mut self, item: impl AsRef<str>) -> Result {
+    pub fn push_parsed(&mut self, item: impl AsRef<str>) -> Result<&mut Self> {
         let tokens = TokenStream::from_str(item.as_ref()).map_err(|e| PushParseError {
             error: e,
             code: item.as_ref().to_string(),
         })?;
         self.stream.extend(tokens);
-        Ok(())
+        Ok(self)
     }
 
     /// Push a single ident to the stream. An ident is any worse that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
-    pub fn ident(&mut self, ident: Ident) {
+    pub fn ident(&mut self, ident: Ident) -> &mut Self {
         self.stream.extend([TokenTree::Ident(ident)]);
+        self
     }
 
     /// Push a single ident to the stream. An ident is any worse that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
-    pub fn ident_str(&mut self, ident: impl AsRef<str>) {
+    pub fn ident_str(&mut self, ident: impl AsRef<str>) -> &mut Self {
         self.stream.extend([TokenTree::Ident(Ident::new(
             ident.as_ref(),
             Span::call_site(),
         ))]);
+        self
     }
 
     /// Add a group. A group is any block surrounded by `{ .. }`, `[ .. ]` or `( .. )`.
     ///
     /// `delim` indicates which group it is. The `inner` callback is used to fill the contents of the group.
-    pub fn group<FN, T>(&mut self, delim: Delimiter, inner: FN) -> crate::Result<T>
+    pub fn group<FN>(&mut self, delim: Delimiter, inner: FN) -> crate::Result<&mut Self>
     where
-        FN: FnOnce(&mut StreamBuilder) -> crate::Result<T>,
+        FN: FnOnce(&mut StreamBuilder) -> crate::Result<()>,
     {
         let mut stream = StreamBuilder::new();
-        let result = inner(&mut stream);
+        inner(&mut stream)?;
         self.stream
             .extend([TokenTree::Group(Group::new(delim, stream.stream))]);
-        result
+        Ok(self)
     }
 
     /// Add a single punctuation to the stream. Puncts are single-character tokens like `.`, `<`, `#`, etc
@@ -78,21 +83,23 @@ impl StreamBuilder {
     /// Note that this should not be used for multi-punct constructions like `::` or `->`. For that use [`puncts`] instead.
     ///
     /// [`puncts`]: #method.puncts
-    pub fn punct(&mut self, p: char) {
+    pub fn punct(&mut self, p: char) -> &mut Self {
         self.stream
             .extend([TokenTree::Punct(Punct::new(p, Spacing::Alone))]);
+        self
     }
 
     /// Add multiple punctuations to the stream. Multi punct tokens are e.g. `::`, `->` and `=>`.
     ///
     /// Note that this is the only way to add multi punct tokens.
     /// If you were to use [`Punct`] to insert `->` it would be inserted as `-` and then `>`, and not form a single token. Rust would interpret this as a "minus sign and then a greater than sign", not as a single arrow.
-    pub fn puncts(&mut self, puncts: &str) {
+    pub fn puncts(&mut self, puncts: &str) -> &mut Self {
         self.stream.extend(
             puncts
                 .chars()
                 .map(|char| TokenTree::Punct(Punct::new(char, Spacing::Joint))),
         );
+        self
     }
 
     /// Add a lifetime to the stream.
@@ -103,11 +110,12 @@ impl StreamBuilder {
     /// builder.ident_str("static");
     /// ```
     /// It would not add `'static`, but instead it would add `' static` as seperate tokens, and the lifetime would not work.
-    pub fn lifetime(&mut self, lt: Ident) {
+    pub fn lifetime(&mut self, lt: Ident) -> &mut Self {
         self.stream.extend([
             TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
             TokenTree::Ident(lt),
         ]);
+        self
     }
 
     /// Add a lifetime to the stream.
@@ -118,23 +126,26 @@ impl StreamBuilder {
     /// builder.ident_str("static");
     /// ```
     /// It would not add `'static`, but instead it would add `' static` as seperate tokens, and the lifetime would not work.
-    pub fn lifetime_str(&mut self, lt: &str) {
+    pub fn lifetime_str(&mut self, lt: &str) -> &mut Self {
         self.stream.extend([
             TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
             TokenTree::Ident(Ident::new(lt, Span::call_site())),
         ]);
+        self
     }
 
     /// Add a literal string (`&'static str`) to the stream.
-    pub fn lit_str(&mut self, str: impl AsRef<str>) {
+    pub fn lit_str(&mut self, str: impl AsRef<str>) -> &mut Self {
         self.stream
             .extend([TokenTree::Literal(Literal::string(str.as_ref()))]);
+        self
     }
 
     /// Add an `usize` value to the stream.
-    pub fn lit_usize(&mut self, val: usize) {
+    pub fn lit_usize(&mut self, val: usize) -> &mut Self {
         self.stream
             .extend([TokenTree::Literal(Literal::usize_unsuffixed(val))]);
+        self
     }
 
     /// Set the given span on all tokens in the stream. This span is used by rust for e.g. compiler errors, to indicate the position of the error.

@@ -225,14 +225,12 @@ impl Generic {
     fn append_to_result_with_constraints(&self, builder: &mut StreamBuilder) {
         match self {
             Self::Lifetime(lt) => builder.lifetime(lt.ident.clone()),
-            Self::Generic(gen) => {
-                builder.ident(gen.ident.clone());
-            }
+            Self::Generic(gen) => builder.ident(gen.ident.clone()),
             Self::Const(gen) => {
                 builder.ident(gen.const_token.clone());
-                builder.ident(gen.ident.clone());
+                builder.ident(gen.ident.clone())
             }
-        }
+        };
         if self.has_constraints() {
             builder.punct(':');
             builder.extend(self.constraints());

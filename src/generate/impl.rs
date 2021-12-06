@@ -52,7 +52,8 @@ impl<'a> FnParent for Impl<'a> {
         self.group.group(Delimiter::Brace, |body| {
             *body = fn_body;
             Ok(())
-        })
+        })?;
+        Ok(())
     }
 }
 

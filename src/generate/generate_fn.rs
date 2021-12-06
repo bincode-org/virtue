@@ -124,7 +124,8 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
     ///     .body(|b| {
-    ///         b.push_parsed("println!(\"hello world\");")
+    ///         b.push_parsed("println!(\"hello world\");")?;
+    ///         Ok(())
     ///     })
     ///     .unwrap();
     /// // fn foo() {

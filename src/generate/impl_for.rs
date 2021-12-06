@@ -86,7 +86,8 @@ impl<'a> FnParent for ImplFor<'a> {
         self.group.group(Delimiter::Brace, |body| {
             *body = fn_body;
             Ok(())
-        })
+        })?;
+        Ok(())
     }
 }
 
@@ -99,7 +100,7 @@ impl Drop for ImplFor<'_> {
                 builder.append(stream);
                 Ok(())
             })
-            .unwrap()
+            .unwrap();
     }
 }
 
