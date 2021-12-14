@@ -49,7 +49,7 @@ impl Generator {
     }
 
     /// Generate an `for <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
-    pub fn impl_for<'a>(&'a mut self, trait_name: &str) -> Result<ImplFor<'a>> {
+    pub fn impl_for<'a, 'b>(&'a mut self, trait_name: &'b str) -> Result<ImplFor<'a, 'b>> {
         ImplFor::new(self, trait_name)
     }
 
@@ -71,11 +71,11 @@ impl Generator {
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
     /// ```
-    pub fn impl_for_with_lifetimes<'a>(
+    pub fn impl_for_with_lifetimes<'a, 'b>(
         &'a mut self,
-        trait_name: &str,
-        lifetimes: &[&str],
-    ) -> Result<ImplFor<'a>> {
+        trait_name: &'b str,
+        lifetimes: &'b [&'b str],
+    ) -> Result<ImplFor<'a, 'b>> {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
     }
 

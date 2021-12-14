@@ -73,6 +73,30 @@ impl Generics {
         self.iter().any(|lt| lt.is_lifetime())
     }
 
+    /// Returns an iterator which contains only the simple type generics
+    pub fn iter_generics(&self) -> impl Iterator<Item = &SimpleGeneric> {
+        self.iter().filter_map(|g| match g {
+            Generic::Generic(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    /// Returns an iterator which contains only the lifetimes
+    pub fn iter_lifetimes(&self) -> impl Iterator<Item = &Lifetime> {
+        self.iter().filter_map(|g| match g {
+            Generic::Lifetime(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    /// Returns an iterator which contains only the const generics
+    pub fn iter_consts(&self) -> impl Iterator<Item = &ConstGeneric> {
+        self.iter().filter_map(|g| match g {
+            Generic::Const(s) => Some(s),
+            _ => None,
+        })
+    }
+
     pub(crate) fn impl_generics(&self) -> StreamBuilder {
         let mut result = StreamBuilder::new();
         result.punct('<');
@@ -407,6 +431,11 @@ impl SimpleGeneric {
         }
         Ok(Self { ident, constraints })
     }
+
+    /// The name of this generic, e.g. `T`
+    pub fn name(&self) -> Ident {
+        self.ident.clone()
+    }
 }
 
 /// a const generic parameter, e.g. `struct Foo<const N: usize> { .. }`
@@ -447,7 +476,7 @@ impl ConstGeneric {
 /// {
 ///     f: PhantomData<F>
 /// }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GenericConstraints {
     constraints: Vec<TokenTree>,
 }
@@ -476,6 +505,34 @@ impl GenericConstraints {
         result.ident_str("where");
         result.extend(self.constraints.clone());
         result
+    }
+
+    /// Push the given constraint onto this stream.
+    ///
+    /// ```ignore
+    /// let mut generic_constraints = GenericConstraints::parse("T: Foo"); // imaginary function
+    /// let mut generic = SimpleGeneric::new("U"); // imaginary function
+    ///
+    /// generic_constraints.push_constraint(&generic, "Bar");
+    ///
+    /// // generic_constraints is now:
+    /// // `T: Foo, U: Bar`
+    /// ```
+    pub fn push_constraint(
+        &mut self,
+        generic: &SimpleGeneric,
+        constraint: impl AsRef<str>,
+    ) -> Result<()> {
+        let mut builder = StreamBuilder::new();
+        if !self.constraints.is_empty() {
+            builder.punct(',');
+        }
+        builder.ident(generic.ident.clone());
+        builder.punct(':');
+        builder.push_parsed(constraint)?;
+        self.constraints.extend(builder.stream.into_iter());
+
+        Ok(())
     }
 }
 
