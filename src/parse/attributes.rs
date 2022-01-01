@@ -116,3 +116,38 @@ pub trait FromAttribute: Sized {
     /// Try to parse the given group into your own type. Return `Ok(None)` if the parsing failed or if the attribute was not this type.
     fn parse(group: &Group) -> Result<Option<Self>>;
 }
+
+/// Bring useful methods to access attributes of an element.
+pub trait AttributeAccess {
+    /// Check to see if has the given attribute. See [`FromAttribute`] for more information.
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool>;
+
+    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>>;
+}
+
+impl AttributeAccess for Vec<Attribute> {
+    fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
+        for attribute in self.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                if attribute == attrib {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
+        for attribute in self.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                return Ok(Some(attribute));
+            }
+        }
+        Ok(None)
+    }
+}
