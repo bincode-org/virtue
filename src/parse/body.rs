@@ -467,32 +467,6 @@ impl UnnamedField {
             None => Span::call_site(),
         }
     }
-
-    /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
-    ///
-    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
-    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
-        for attribute in self.attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens)? {
-                if attribute == attrib {
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
-    }
-
-    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
-    ///
-    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
-    pub fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
-        for attribute in self.attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens)? {
-                return Ok(Some(attribute));
-            }
-        }
-        Ok(None)
-    }
 }
 
 /// Reference to an enum variant's field. Either by index or by ident.
@@ -552,40 +526,6 @@ impl<'a> IdentOrIndex<'a> {
                 format!("{}{}", prefix, index)
             }
         }
-    }
-
-    /// Check to see if the field has the given attribute. See [`FromAttribute`] for more information.
-    ///
-    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
-    pub fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
-        let attributes = match self {
-            Self::Ident { attributes, .. } => attributes,
-            Self::Index { attributes, .. } => attributes,
-        };
-        for attribute in attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens)? {
-                if attribute == attrib {
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
-    }
-
-    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
-    ///
-    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
-    pub fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
-        let attributes = match self {
-            Self::Ident { attributes, .. } => attributes,
-            Self::Index { attributes, .. } => attributes,
-        };
-        for attribute in attributes.iter() {
-            if let Some(attribute) = T::parse(&attribute.tokens)? {
-                return Ok(Some(attribute));
-            }
-        }
-        Ok(None)
     }
 }
 
