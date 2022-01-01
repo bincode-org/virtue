@@ -1,5 +1,5 @@
 use super::attributes::AttributeLocation;
-use super::{utils::*, Attribute, FromAttribute, Visibility};
+use super::{utils::*, Attribute, Visibility};
 use crate::prelude::{Delimiter, Ident, Literal, Span, TokenTree};
 use crate::{Error, Result};
 use std::iter::Peekable;
