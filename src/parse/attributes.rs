@@ -96,23 +96,51 @@ fn test_attributes_try_take() {
     }
 }
 
-/// Helper trait for functions like:
-/// - [`UnnamedField::has_attribute`]
-/// - [`UnnamedField::get_attribute`]
-/// - [`IdentOrIndex::has_attribute`]
-/// - [`IdentOrIndex::get_attribute`]
+/// Helper trait for [`AttributeAccess`] methods.
 ///
 /// This can be implemented on your own type to make parsing easier.
 ///
 /// Some functions that can make your life easier:
 /// - [`utils::parse_tagged_attribute`] is a helper for parsing attributes in the format of `#[prefix(...)]`
 ///
-/// [`IdentOrIndex::has_attribute`]: enum.IdentOrIndex.html#method.has_attribute
-/// [`IdentOrIndex::get_attribute`]: enum.IdentOrIndex.html#method.get_attribute
-/// [`UnnamedField::has_attribute`]: struct.UnnamedField.html#method.has_attribute
-/// [`UnnamedField::get_attribute`]: struct.UnnamedField.html#method.get_attribute
+/// [`AttributeAccess`]: trait.AttributeAccess.html
 /// [`utils::parse_tagged_attribute`]: ../utils/fn.parse_tagged_attribute.html
 pub trait FromAttribute: Sized {
     /// Try to parse the given group into your own type. Return `Ok(None)` if the parsing failed or if the attribute was not this type.
     fn parse(group: &Group) -> Result<Option<Self>>;
+}
+
+/// Bring useful methods to access attributes of an element.
+pub trait AttributeAccess {
+    /// Check to see if has the given attribute. See [`FromAttribute`] for more information.
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool>;
+
+    /// Returns the first attribute that returns `Some(Self)`. See [`FromAttribute`] for more information.
+    ///
+    /// **note**: Will immediately return `Err(_)` on the first error `T` returns.
+    fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>>;
+}
+
+impl AttributeAccess for Vec<Attribute> {
+    fn has_attribute<T: FromAttribute + PartialEq<T>>(&self, attrib: T) -> Result<bool> {
+        for attribute in self.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                if attribute == attrib {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn get_attribute<T: FromAttribute>(&self) -> Result<Option<T>> {
+        for attribute in self.iter() {
+            if let Some(attribute) = T::parse(&attribute.tokens)? {
+                return Ok(Some(attribute));
+            }
+        }
+        Ok(None)
+    }
 }
