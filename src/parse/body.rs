@@ -527,6 +527,14 @@ impl<'a> IdentOrIndex<'a> {
             }
         }
     }
+
+    /// Returns the attributes of this field.
+    pub fn attributes(&self) -> &Vec<Attribute> {
+        match self {
+            Self::Ident { attributes, .. } => attributes,
+            Self::Index { attributes, .. } => attributes,
+        }
+    }
 }
 
 impl std::fmt::Display for IdentOrIndex<'_> {
