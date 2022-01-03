@@ -56,14 +56,6 @@
           "uses": "actions-rs/cargo@v1",
           "with": {
             "command": "check",
-            "args": "--bench *"
-          },
-          "name": "Run `cargo check` on benches"
-        },
-        {
-          "uses": "actions-rs/cargo@v1",
-          "with": {
-            "command": "check",
             "args": "--examples"
           },
           "name": "Check examples"
