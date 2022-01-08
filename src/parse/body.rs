@@ -135,9 +135,9 @@ impl EnumBody {
         let stream = &mut group.stream().into_iter().peekable();
         while stream.peek().is_some() {
             let attributes = Attribute::try_take(AttributeLocation::Variant, stream)?;
-            let ident = match stream.peek() {
-                Some(TokenTree::Ident(_)) => assume_ident(stream.next()),
-                token => return Error::wrong_token(token, "ident"),
+            let ident = match super::utils::consume_ident(stream) {
+                Some(ident) => ident,
+                None => Error::wrong_token(stream.peek(), "ident")?,
             };
 
             let mut fields = Fields::Unit;
