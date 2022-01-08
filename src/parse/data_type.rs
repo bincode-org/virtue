@@ -12,17 +12,16 @@ impl DataType {
     pub(crate) fn take(
         input: &mut Peekable<impl Iterator<Item = TokenTree>>,
     ) -> Result<(Self, Ident)> {
-        if let Some(TokenTree::Ident(_)) = input.peek() {
-            let ident = super::utils::assume_ident(input.next());
+        if let Some(ident) = super::utils::consume_ident(input) {
             let result = match ident.to_string().as_str() {
                 "struct" => DataType::Struct,
                 "enum" => DataType::Enum,
                 _ => return Err(Error::UnknownDataType(ident.span())),
             };
-            return match input.next() {
-                Some(TokenTree::Ident(ident)) => Ok((result, ident)),
-                token => Error::wrong_token(token.as_ref(), "ident"),
-            };
+
+            if let Some(ident) = super::utils::consume_ident(input) {
+                return Ok((result, ident));
+            }
         }
         Error::wrong_token(input.peek(), "ident")
     }
