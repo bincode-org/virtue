@@ -101,17 +101,19 @@ impl Parse {
         }
     }
 
-    /// Split this struct or enum into a [`Generator`] or [`Body`].
-    pub fn into_generator(self) -> (Generator, Body) {
+    /// Split this struct or enum into a [`Generator`], list of [`Attribute`] and [`Body`].
+    pub fn into_generator(self) -> (Generator, Vec<Attribute>, Body) {
         match self {
             Parse::Struct {
                 name,
                 generics,
                 generic_constraints,
                 body,
+                attributes,
                 ..
             } => (
                 Generator::new(name, generics, generic_constraints),
+                attributes,
                 Body::Struct(body),
             ),
             Parse::Enum {
@@ -119,9 +121,11 @@ impl Parse {
                 generics,
                 generic_constraints,
                 body,
+                attributes,
                 ..
             } => (
                 Generator::new(name, generics, generic_constraints),
+                attributes,
                 Body::Enum(body),
             ),
         }
