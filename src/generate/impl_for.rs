@@ -6,34 +6,39 @@ use crate::{
 
 #[must_use]
 /// A helper struct for implementing a trait for a given struct or enum.
-pub struct ImplFor<'a, 'b> {
+pub struct ImplFor<'a> {
     generator: &'a mut Generator,
-    trait_name: &'b str,
-    lifetimes: Option<&'b [&'b str]>,
+    trait_name: String,
+    lifetimes: Option<Vec<String>>,
     custom_generic_constraints: Option<GenericConstraints>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
 
-impl<'a, 'b> ImplFor<'a, 'b> {
-    pub(super) fn new(generator: &'a mut Generator, trait_name: &'b str) -> Result<Self> {
+impl<'a> ImplFor<'a> {
+    pub(super) fn new(generator: &'a mut Generator, trait_name: impl Into<String>) -> Result<Self> {
         Ok(Self {
             generator,
-            trait_name,
+            trait_name: trait_name.into(),
             lifetimes: None,
             custom_generic_constraints: None,
             fns: Vec::new(),
         })
     }
 
-    pub(super) fn new_with_lifetimes(
+    pub(super) fn new_with_lifetimes<ITER, I, T>(
         generator: &'a mut Generator,
-        trait_name: &'b str,
-        lifetimes: &'b [&'b str],
-    ) -> Result<Self> {
+        trait_name: T,
+        lifetimes: ITER,
+    ) -> Result<Self>
+    where
+        ITER: IntoIterator<Item = I>,
+        I: Into<String>,
+        T: Into<String>,
+    {
         Ok(Self {
             generator,
-            trait_name,
-            lifetimes: Some(lifetimes),
+            trait_name: trait_name.into(),
+            lifetimes: Some(lifetimes.into_iter().map(Into::into).collect()),
             custom_generic_constraints: None,
             fns: Vec::new(),
         })
@@ -50,7 +55,7 @@ impl<'a, 'b> ImplFor<'a, 'b> {
     /// ```
     ///
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
-    pub fn generate_fn<'c>(&'c mut self, name: &'b str) -> FnBuilder<'c, ImplFor<'a, 'b>> {
+    pub fn generate_fn(&mut self, name: impl Into<String>) -> FnBuilder<ImplFor<'a>> {
         FnBuilder::new(self, name)
     }
 
@@ -97,14 +102,14 @@ impl<'a, 'b> ImplFor<'a, 'b> {
     }
 }
 
-impl<'a, 'b> FnParent for ImplFor<'a, 'b> {
+impl<'a> FnParent for ImplFor<'a> {
     fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
         self.fns.push((fn_definition, fn_body));
         Ok(())
     }
 }
 
-impl Drop for ImplFor<'_, '_> {
+impl Drop for ImplFor<'_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             return;
@@ -131,7 +136,7 @@ impl Drop for ImplFor<'_, '_> {
     }
 }
 
-impl ImplFor<'_, '_> {
+impl ImplFor<'_> {
     fn generate_fn_definition(&mut self, builder: &mut StreamBuilder) {
         builder.ident_str("impl");
         if let Some(lifetimes) = &self.lifetimes {
@@ -143,7 +148,7 @@ impl ImplFor<'_, '_> {
         } else if let Some(generics) = &self.generator.generics {
             builder.append(generics.impl_generics());
         }
-        builder.push_parsed(self.trait_name).unwrap();
+        builder.push_parsed(&self.trait_name).unwrap();
         if let Some(lifetimes) = &self.lifetimes {
             append_lifetimes(builder, lifetimes);
         }
@@ -160,7 +165,7 @@ impl ImplFor<'_, '_> {
     }
 }
 
-fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[&str]) {
+fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
     for (idx, lt) in lifetimes.iter().enumerate() {
         builder.punct(if idx == 0 { '<' } else { ',' });
         builder.lifetime_str(lt);
