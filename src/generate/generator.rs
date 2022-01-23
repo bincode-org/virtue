@@ -49,7 +49,7 @@ impl Generator {
     }
 
     /// Generate an `for <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
-    pub fn impl_for<'a, 'b>(&'a mut self, trait_name: &'b str) -> Result<ImplFor<'a, 'b>> {
+    pub fn impl_for(&mut self, trait_name: impl Into<String>) -> Result<ImplFor> {
         ImplFor::new(self, trait_name)
     }
 
@@ -66,16 +66,21 @@ impl Generator {
     /// ```no_run
     /// # use virtue::prelude::*;
     /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
-    /// generator.impl_for_with_lifetimes("Foo", &["a", "b"]);
+    /// generator.impl_for_with_lifetimes("Foo", ["a", "b"]);
     ///
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
     /// ```
-    pub fn impl_for_with_lifetimes<'a, 'b>(
-        &'a mut self,
-        trait_name: &'b str,
-        lifetimes: &'b [&'b str],
-    ) -> Result<ImplFor<'a, 'b>> {
+    pub fn impl_for_with_lifetimes<ITER, I, T>(
+        &mut self,
+        trait_name: T,
+        lifetimes: ITER,
+    ) -> Result<ImplFor>
+    where
+        ITER: IntoIterator<Item = I>,
+        I: Into<String>,
+        T: Into<String>,
+    {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
     }
 

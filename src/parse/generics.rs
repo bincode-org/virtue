@@ -116,7 +116,7 @@ impl Generics {
 
     pub(crate) fn impl_generics_with_additional_lifetimes(
         &self,
-        lifetime: &[&str],
+        lifetime: &[String],
     ) -> StreamBuilder {
         assert!(self.has_lifetime());
 

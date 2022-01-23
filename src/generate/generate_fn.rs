@@ -4,20 +4,20 @@ use crate::prelude::{Delimiter, Result};
 /// A builder for functions.
 pub struct FnBuilder<'a, P> {
     parent: &'a mut P,
-    name: &'a str,
+    name: String,
 
-    lifetimes: Vec<(&'a str, Vec<&'a str>)>,
-    generics: Vec<(&'a str, Vec<&'a str>)>,
+    lifetimes: Vec<(String, Vec<String>)>,
+    generics: Vec<(String, Vec<String>)>,
     self_arg: FnSelfArg,
-    args: Vec<(&'a str, &'a str)>,
-    return_type: Option<&'a str>,
+    args: Vec<(String, String)>,
+    return_type: Option<String>,
 }
 
 impl<'a, P: FnParent> FnBuilder<'a, P> {
-    pub(super) fn new(parent: &'a mut P, name: &'a str) -> Self {
+    pub(super) fn new(parent: &'a mut P, name: impl Into<String>) -> Self {
         Self {
             parent,
-            name,
+            name: name.into(),
             lifetimes: Vec::new(),
             generics: Vec::new(),
             self_arg: FnSelfArg::None,
@@ -28,28 +28,23 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Add a lifetime parameter.
     ///
-    /// `dependencies` are the optional lifetime dependencies of the given lifetime.
-    ///
     /// ```no_run
     /// # use virtue::prelude::Generator;
     /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_lifetime("a", None) // fn foo<'a>()
-    ///     .with_lifetime("b", ["a"]); // fn foo<'a, 'b: 'a>();
+    ///     .with_lifetime("a"); // fn foo<'a>()
     /// ```
-    pub fn with_lifetime<DEP>(mut self, name: &'a str, dependencies: DEP) -> Self
-    where
-        DEP: IntoIterator<Item = &'a str>,
-    {
-        self.lifetimes
-            .push((name, dependencies.into_iter().collect()));
+    #[must_use]
+    pub fn with_lifetime(mut self, name: impl Into<String>) -> Self {
+        self.lifetimes.push((name.into(), Vec::new()));
         self
     }
-    /// Add a generic parameter. Keep in mind that will *not* work for lifetimes.
+
+    /// Add a lifetime parameter.
     ///
-    /// `dependencies` are the optional dependencies of the parameter.
+    /// `dependencies` are the lifetime dependencies of the given lifetime.
     ///
     /// ```no_run
     /// # use virtue::prelude::Generator;
@@ -57,15 +52,65 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_generic("D", None) // fn foo<D>()
-    ///     .with_generic("E", ["Encodable"]); // fn foo<D, E: Encodable>();
+    ///     .with_lifetime("a") // fn foo<'a>()
+    ///     .with_lifetime_deps("b", ["a"]); // fn foo<'b: 'a>()
     /// ```
-    pub fn with_generic<DEP>(mut self, name: &'a str, dependencies: DEP) -> Self
+    #[must_use]
+    pub fn with_lifetime_deps<ITER, I>(
+        mut self,
+        name: impl Into<String>,
+        dependencies: ITER,
+    ) -> Self
     where
-        DEP: IntoIterator<Item = &'a str>,
+        ITER: IntoIterator<Item = I>,
+        I: Into<String>,
     {
-        self.generics
-            .push((name, dependencies.into_iter().collect()));
+        self.lifetimes.push((
+            name.into(),
+            dependencies.into_iter().map(Into::into).collect(),
+        ));
+        self
+    }
+
+    /// Add a generic parameter. Keep in mind that will *not* work for lifetimes.
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator
+    ///     .r#impl()
+    ///     .generate_fn("foo") // fn foo()
+    ///     .with_generic("D"); // fn foo<D>()
+    /// ```
+    #[must_use]
+    pub fn with_generic(mut self, name: impl Into<String>) -> Self {
+        self.generics.push((name.into(), Vec::new()));
+        self
+    }
+
+    /// Add a generic parameter. Keep in mind that will *not* work for lifetimes.
+    ///
+    /// `dependencies` are the dependencies of the parameter.
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator
+    ///     .r#impl()
+    ///     .generate_fn("foo") // fn foo()
+    ///     .with_generic("D") // fn foo<D>()
+    ///     .with_generic_deps("E", ["Encodable"]); // fn foo<D, E: Encodable>();
+    /// ```
+    #[must_use]
+    pub fn with_generic_deps<DEP, I>(mut self, name: impl Into<String>, dependencies: DEP) -> Self
+    where
+        DEP: IntoIterator<Item = I>,
+        I: Into<String>,
+    {
+        self.generics.push((
+            name.into(),
+            dependencies.into_iter().map(Into::into).collect(),
+        ));
         self
     }
 
@@ -79,6 +124,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///     .generate_fn("foo") // fn foo()
     ///     .with_self_arg(FnSelfArg::RefSelf); // fn foo(&self)
     /// ```
+    #[must_use]
     pub fn with_self_arg(mut self, self_arg: FnSelfArg) -> Self {
         self.self_arg = self_arg;
         self
@@ -95,8 +141,9 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///     .with_arg("a", "u32") // fn foo(a: u32)
     ///     .with_arg("b", "u32"); // fn foo(a: u32, b: u32)
     /// ```
-    pub fn with_arg(mut self, name: &'a str, ty: &'a str) -> Self {
-        self.args.push((name, ty));
+    #[must_use]
+    pub fn with_arg(mut self, name: impl Into<String>, ty: impl Into<String>) -> Self {
+        self.args.push((name.into(), ty.into()));
         self
     }
 
@@ -110,8 +157,9 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///     .generate_fn("foo") // fn foo()
     ///     .with_return_type("u32"); // fn foo() -> u32
     /// ```
-    pub fn with_return_type(mut self, ret_type: &'a str) -> Self {
-        self.return_type = Some(ret_type);
+    #[must_use]
+    pub fn with_return_type(mut self, ret_type: impl Into<String>) -> Self {
+        self.return_type = Some(ret_type.into());
         self
     }
 
@@ -162,11 +210,11 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
                 } else {
                     builder.punct(',');
                 }
-                builder.lifetime_str(lifetime);
+                builder.lifetime_str(lifetime.as_ref());
                 if !dependencies.is_empty() {
                     for (idx, dependency) in dependencies.into_iter().enumerate() {
                         builder.punct(if idx == 0 { ':' } else { '+' });
-                        builder.lifetime_str(dependency);
+                        builder.lifetime_str(dependency.as_ref());
                     }
                 }
             }
