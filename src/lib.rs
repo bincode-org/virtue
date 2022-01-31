@@ -77,22 +77,20 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 pub use self::error::Error;
 
-#[cfg(test)]
 /// Useful includes
 pub mod prelude {
-    pub use crate::generate::{FnSelfArg, Generator};
-    pub use crate::parse::{AttributeAccess, Body, FromAttribute, Parse};
+    pub use crate::generate::{FnSelfArg, Generator, StreamBuilder};
+    pub use crate::parse::{
+        AttributeAccess, Body, EnumVariant, Fields, FromAttribute, Parse, UnnamedField,
+    };
     pub use crate::Result;
-    pub use proc_macro2::*;
-}
-#[cfg(not(test))]
-/// Useful includes
-pub mod prelude {
-    extern crate proc_macro;
 
-    pub use crate::generate::{FnSelfArg, Generator};
-    pub use crate::parse::{AttributeAccess, Body, FromAttribute, Parse};
-    pub use crate::Result;
+    #[cfg(test)]
+    pub use proc_macro2::*;
+
+    #[cfg(not(test))]
+    extern crate proc_macro;
+    #[cfg(not(test))]
     pub use proc_macro::*;
 }
 
