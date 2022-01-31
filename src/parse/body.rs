@@ -439,7 +439,9 @@ impl UnnamedField {
         Ok(result)
     }
 
-    #[cfg(test)]
+    /// Return [`type`] as a string. Useful for comparing it for known values.
+    ///
+    /// [`type`]: #structfield.type
     pub fn type_string(&self) -> String {
         self.r#type.iter().map(|t| t.to_string()).collect()
     }
