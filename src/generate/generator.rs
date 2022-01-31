@@ -30,8 +30,8 @@ impl Generator {
     }
 
     /// Return the name for the struct or enum that this is going to be implemented on.
-    pub fn target_name(&self) -> &Ident {
-        &self.name
+    pub fn target_name(&self) -> Ident {
+        self.name.clone()
     }
 
     /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
@@ -82,6 +82,39 @@ impl Generator {
         T: Into<String>,
     {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
+    }
+
+    /// Export the current stream to a file, making it very easy to debug the output of a derive macro.
+    /// This will try to find rust's `target` file, and write `target/<name>_<file_postfix>.rs`.
+    ///
+    /// Will return `true` if the file is written, `false` otherwise.
+    ///
+    /// The outputted file is unformatted. Use `cargo fmt -- target/<file>.rs` to format the file.
+    pub fn export_to_file(&self, file_postfix: &str) -> bool {
+        use std::io::Write;
+
+        if let Ok(var) = std::env::var("CARGO_MANIFEST_DIR") {
+            let mut path = std::path::PathBuf::from(var);
+            loop {
+                {
+                    let mut path = path.clone();
+                    path.push("target");
+                    if path.exists() {
+                        path.push(format!("{}_{}.rs", self.target_name(), file_postfix));
+                        if let Ok(mut file) = std::fs::File::create(path) {
+                            let _ = file.write_all(self.stream.stream.to_string().as_bytes());
+                            return true;
+                        }
+                    }
+                }
+                if let Some(parent) = path.parent() {
+                    path = parent.to_owned();
+                } else {
+                    break;
+                }
+            }
+        }
+        false
     }
 
     /// Consume the contents of this generator. This *must* be called, or else the generator will panic on drop.
