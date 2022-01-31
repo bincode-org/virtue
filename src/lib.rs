@@ -83,7 +83,7 @@ pub mod prelude {
     pub use crate::parse::{
         AttributeAccess, Body, EnumVariant, Fields, FromAttribute, Parse, UnnamedField,
     };
-    pub use crate::Result;
+    pub use crate::{Error, Result};
 
     #[cfg(test)]
     pub use proc_macro2::*;
