@@ -1,4 +1,4 @@
-use super::{generate_fn::FnParent, FnBuilder, Generator, StreamBuilder};
+use super::{generate_fn::FnParent, FnBuilder, Parent, StreamBuilder};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -6,42 +6,42 @@ use crate::{
 
 #[must_use]
 /// A helper struct for implementing a trait for a given struct or enum.
-pub struct ImplFor<'a> {
-    generator: &'a mut Generator,
+pub struct ImplFor<'a, P: Parent> {
+    generator: &'a mut P,
     trait_name: String,
     lifetimes: Option<Vec<String>>,
     custom_generic_constraints: Option<GenericConstraints>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
 
-impl<'a> ImplFor<'a> {
-    pub(super) fn new(generator: &'a mut Generator, trait_name: impl Into<String>) -> Result<Self> {
-        Ok(Self {
+impl<'a, P: Parent> ImplFor<'a, P> {
+    pub(super) fn new(generator: &'a mut P, trait_name: impl Into<String>) -> Self {
+        Self {
             generator,
             trait_name: trait_name.into(),
             lifetimes: None,
             custom_generic_constraints: None,
             fns: Vec::new(),
-        })
+        }
     }
 
     pub(super) fn new_with_lifetimes<ITER, I, T>(
-        generator: &'a mut Generator,
+        generator: &'a mut P,
         trait_name: T,
         lifetimes: ITER,
-    ) -> Result<Self>
+    ) -> Self
     where
         ITER: IntoIterator<Item = I>,
         I: Into<String>,
         T: Into<String>,
     {
-        Ok(Self {
+        Self {
             generator,
             trait_name: trait_name.into(),
             lifetimes: Some(lifetimes.into_iter().map(Into::into).collect()),
             custom_generic_constraints: None,
             fns: Vec::new(),
-        })
+        }
     }
 
     /// Add a function to the trait implementation.
@@ -55,7 +55,7 @@ impl<'a> ImplFor<'a> {
     /// ```
     ///
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
-    pub fn generate_fn(&mut self, name: impl Into<String>) -> FnBuilder<ImplFor<'a>> {
+    pub fn generate_fn(&mut self, name: impl Into<String>) -> FnBuilder<ImplFor<'a, P>> {
         FnBuilder::new(self, name)
     }
 
@@ -89,11 +89,11 @@ impl<'a> ImplFor<'a> {
     where
         CB: FnOnce(&Generics, &mut GenericConstraints),
     {
-        if let Some(generics) = self.generator.generics.as_ref() {
+        if let Some(generics) = self.generator.generics() {
             let mut constraints = self
                 .generator
-                .generic_constraints
-                .clone()
+                .generic_constraints()
+                .cloned()
                 .unwrap_or_default();
             cb(generics, &mut constraints);
             self.custom_generic_constraints = Some(constraints)
@@ -102,14 +102,14 @@ impl<'a> ImplFor<'a> {
     }
 }
 
-impl<'a> FnParent for ImplFor<'a> {
+impl<'a, P: Parent> FnParent for ImplFor<'a, P> {
     fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
         self.fns.push((fn_definition, fn_body));
         Ok(())
     }
 }
 
-impl Drop for ImplFor<'_> {
+impl<P: Parent> Drop for ImplFor<'_, P> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             return;
@@ -132,20 +132,20 @@ impl Drop for ImplFor<'_> {
             })
             .unwrap();
 
-        self.generator.stream.append(builder);
+        self.generator.append(builder);
     }
 }
 
-impl ImplFor<'_> {
+impl<P: Parent> ImplFor<'_, P> {
     fn generate_fn_definition(&mut self, builder: &mut StreamBuilder) {
         builder.ident_str("impl");
         if let Some(lifetimes) = &self.lifetimes {
-            if let Some(generics) = &self.generator.generics {
+            if let Some(generics) = self.generator.generics() {
                 builder.append(generics.impl_generics_with_additional_lifetimes(lifetimes));
             } else {
                 append_lifetimes(builder, lifetimes);
             }
-        } else if let Some(generics) = &self.generator.generics {
+        } else if let Some(generics) = self.generator.generics() {
             builder.append(generics.impl_generics());
         }
         builder.push_parsed(&self.trait_name).unwrap();
@@ -153,13 +153,13 @@ impl ImplFor<'_> {
             append_lifetimes(builder, lifetimes);
         }
         builder.ident_str("for");
-        builder.ident(self.generator.name.clone());
-        if let Some(generics) = &self.generator.generics {
+        builder.ident(self.generator.name().clone());
+        if let Some(generics) = &self.generator.generics() {
             builder.append(generics.type_generics());
         }
         if let Some(generic_constraints) = self.custom_generic_constraints.take() {
             builder.append(generic_constraints.where_clause());
-        } else if let Some(generic_constraints) = &self.generator.generic_constraints {
+        } else if let Some(generic_constraints) = &self.generator.generic_constraints() {
             builder.append(generic_constraints.where_clause());
         }
     }
