@@ -1,4 +1,4 @@
-use super::{generate_fn::FnParent, FnBuilder, Generator, StreamBuilder};
+use super::{generate_fn::FnParent, FnBuilder, Generator, Parent, StreamBuilder};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -6,17 +6,28 @@ use crate::{
 
 #[must_use]
 /// A helper struct for implementing functions for a given struct or enum.
-pub struct Impl<'a> {
-    generator: &'a mut Generator,
+pub struct Impl<'a, P: Parent> {
+    parent: &'a mut P,
+    name: String,
     // pub(super) group: StreamBuilder,
     custom_generic_constraints: Option<GenericConstraints>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
 
-impl<'a> Impl<'a> {
-    pub(super) fn new(generator: &'a mut Generator) -> Self {
+impl<'a, P: Parent> Impl<'a, P> {
+    pub(super) fn with_parent_name(parent: &'a mut P) -> Self {
         Self {
-            generator,
+            name: parent.name().to_string(),
+            parent,
+            custom_generic_constraints: None,
+            fns: Vec::new(),
+        }
+    }
+
+    pub(super) fn new(parent: &'a mut P, name: impl Into<String>) -> Self {
+        Self {
+            parent,
+            name: name.into(),
             custom_generic_constraints: None,
             fns: Vec::new(),
         }
@@ -33,10 +44,12 @@ impl<'a> Impl<'a> {
     /// ```
     ///
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
-    pub fn generate_fn<'b>(&'b mut self, name: &'a str) -> FnBuilder<'b, Impl<'a>> {
+    pub fn generate_fn(&mut self, name: impl Into<String>) -> FnBuilder<Self> {
         FnBuilder::new(self, name)
     }
+}
 
+impl<'a> Impl<'a, Generator> {
     /// Modify the generic constraints of a type.
     /// This can be used to add additional type constraints to your implementation.
     ///
@@ -63,15 +76,16 @@ impl<'a> Impl<'a> {
     /// }
     /// ```
     ///
+    /// Note that this function is only implemented when you call `.r#impl` on [`Generator`].
     pub fn modify_generic_constraints<CB>(&mut self, cb: CB) -> &mut Self
     where
         CB: FnOnce(&Generics, &mut GenericConstraints),
     {
-        if let Some(generics) = self.generator.generics.as_ref() {
+        if let Some(generics) = self.parent.generics() {
             let mut constraints = self
-                .generator
-                .generic_constraints
-                .clone()
+                .parent
+                .generic_constraints()
+                .cloned()
                 .unwrap_or_default();
             cb(generics, &mut constraints);
             self.custom_generic_constraints = Some(constraints)
@@ -80,14 +94,14 @@ impl<'a> Impl<'a> {
     }
 }
 
-impl<'a> FnParent for Impl<'a> {
+impl<'a, P: Parent> FnParent for Impl<'a, P> {
     fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
         self.fns.push((fn_definition, fn_body));
         Ok(())
     }
 }
 
-impl Drop for Impl<'_> {
+impl<'a, P: Parent> Drop for Impl<'a, P> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             return;
@@ -95,17 +109,17 @@ impl Drop for Impl<'_> {
         let mut builder = StreamBuilder::new();
         builder.ident_str("impl");
 
-        if let Some(generics) = &self.generator.generics {
+        if let Some(generics) = self.parent.generics() {
             builder.append(generics.impl_generics());
         }
-        builder.ident(self.generator.name.clone());
+        builder.push_parsed(&self.name).unwrap();
 
-        if let Some(generics) = &self.generator.generics {
+        if let Some(generics) = self.parent.generics() {
             builder.append(generics.type_generics());
         }
         if let Some(generic_constraints) = self.custom_generic_constraints.take() {
             builder.append(generic_constraints.where_clause());
-        } else if let Some(generic_constraints) = &self.generator.generic_constraints {
+        } else if let Some(generic_constraints) = self.parent.generic_constraints() {
             builder.append(generic_constraints.where_clause());
         }
 
@@ -124,6 +138,6 @@ impl Drop for Impl<'_> {
             })
             .unwrap();
 
-        self.generator.stream.append(builder);
+        self.parent.append(builder);
     }
 }

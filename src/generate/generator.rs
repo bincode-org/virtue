@@ -1,6 +1,6 @@
-use super::{Impl, ImplFor, StreamBuilder};
+use super::{GenerateMod, Impl, ImplFor, StreamBuilder};
 use crate::parse::{GenericConstraints, Generics};
-use crate::prelude::{Ident, Result, TokenStream};
+use crate::prelude::{Ident, TokenStream};
 
 #[must_use]
 /// The generator is used to generate code.
@@ -35,8 +35,8 @@ impl Generator {
     }
 
     /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
-    pub fn r#impl(&mut self) -> Impl {
-        Impl::new(self)
+    pub fn r#impl(&mut self) -> Impl<Self> {
+        Impl::with_parent_name(self)
     }
 
     /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
@@ -44,12 +44,12 @@ impl Generator {
     /// Alias for [`impl`] which doesn't need a `r#` prefix.
     ///
     /// [`impl`]: #method.impl
-    pub fn generate_impl(&mut self) -> Impl {
-        Impl::new(self)
+    pub fn generate_impl(&mut self) -> Impl<Self> {
+        Impl::with_parent_name(self)
     }
 
     /// Generate an `for <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
-    pub fn impl_for(&mut self, trait_name: impl Into<String>) -> Result<ImplFor> {
+    pub fn impl_for(&mut self, trait_name: impl Into<String>) -> ImplFor<Self> {
         ImplFor::new(self, trait_name)
     }
 
@@ -75,13 +75,18 @@ impl Generator {
         &mut self,
         trait_name: T,
         lifetimes: ITER,
-    ) -> Result<ImplFor>
+    ) -> ImplFor<Self>
     where
         ITER: IntoIterator<Item = I>,
         I: Into<String>,
         T: Into<String>,
     {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
+    }
+
+    /// Generate a `mod <name> { ... }`. See [`GenerateMod`] for more info.
+    pub fn generate_mod(&mut self, mod_name: impl Into<String>) -> GenerateMod<Self> {
+        GenerateMod::new(self, mod_name)
     }
 
     /// Export the current stream to a file, making it very easy to debug the output of a derive macro.
@@ -128,5 +133,23 @@ impl Drop for Generator {
         if !self.stream.stream.is_empty() && !std::thread::panicking() {
             eprintln!("WARNING: Generator dropped but the stream is not empty. Please call `.finish()` on the generator");
         }
+    }
+}
+
+impl super::Parent for Generator {
+    fn append(&mut self, builder: StreamBuilder) {
+        self.stream.append(builder);
+    }
+
+    fn name(&self) -> &Ident {
+        &self.name
+    }
+
+    fn generics(&self) -> Option<&Generics> {
+        self.generics.as_ref()
+    }
+
+    fn generic_constraints(&self) -> Option<&GenericConstraints> {
+        self.generic_constraints.as_ref()
     }
 }
