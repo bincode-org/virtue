@@ -12,7 +12,9 @@
 //! [`Generator::finish()`]: struct.Generator.html#method.finish
 //! [`TokenStream`]: ../prelude/struct.TokenStream.html
 
+mod gen_struct;
 mod generate_fn;
+mod generate_mod;
 mod generator;
 mod r#impl;
 mod impl_for;
@@ -23,7 +25,9 @@ use crate::{
     prelude::Ident,
 };
 
+pub use self::gen_struct::GenStruct;
 pub use self::generate_fn::{FnBuilder, FnSelfArg};
+pub use self::generate_mod::GenerateMod;
 pub use self::generator::Generator;
 pub use self::impl_for::ImplFor;
 pub use self::r#impl::Impl;

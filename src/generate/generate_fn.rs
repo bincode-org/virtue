@@ -1,5 +1,8 @@
 use super::StreamBuilder;
-use crate::prelude::{Delimiter, Result};
+use crate::{
+    parse::Visibility,
+    prelude::{Delimiter, Result},
+};
 
 /// A builder for functions.
 pub struct FnBuilder<'a, P> {
@@ -11,6 +14,7 @@ pub struct FnBuilder<'a, P> {
     self_arg: FnSelfArg,
     args: Vec<(String, String)>,
     return_type: Option<String>,
+    vis: Visibility,
 }
 
 impl<'a, P: FnParent> FnBuilder<'a, P> {
@@ -23,6 +27,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
             self_arg: FnSelfArg::None,
             args: Vec::new(),
             return_type: None,
+            vis: Visibility::Default,
         }
     }
 
@@ -163,6 +168,13 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         self
     }
 
+    /// Make the function `pub`. If this is not called, the function will have no visibility modifier.
+    #[must_use]
+    pub fn make_pub(mut self) -> Self {
+        self.vis = Visibility::Pub;
+        self
+    }
+
     /// Complete the function definition. This function takes a callback that will form the body of the function.
     ///
     /// ```no_run
@@ -192,11 +204,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
             self_arg,
             args,
             return_type,
+            vis,
         } = self;
 
         let mut builder = StreamBuilder::new();
 
         // function name; `fn name`
+        if vis == Visibility::Pub {
+            builder.ident_str("pub");
+        }
         builder.ident_str("fn");
         builder.ident_str(name);
 
