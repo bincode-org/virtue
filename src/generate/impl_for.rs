@@ -10,7 +10,9 @@ pub struct ImplFor<'a, P: Parent> {
     generator: &'a mut P,
     trait_name: String,
     lifetimes: Option<Vec<String>>,
+    consts: Vec<StreamBuilder>,
     custom_generic_constraints: Option<GenericConstraints>,
+    impl_types: Vec<StreamBuilder>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
 
@@ -20,7 +22,9 @@ impl<'a, P: Parent> ImplFor<'a, P> {
             generator,
             trait_name: trait_name.into(),
             lifetimes: None,
+            consts: Vec::new(),
             custom_generic_constraints: None,
+            impl_types: Vec::new(),
             fns: Vec::new(),
         }
     }
@@ -39,8 +43,35 @@ impl<'a, P: Parent> ImplFor<'a, P> {
             generator,
             trait_name: trait_name.into(),
             lifetimes: Some(lifetimes.into_iter().map(Into::into).collect()),
+            consts: Vec::new(),
             custom_generic_constraints: None,
+            impl_types: Vec::new(),
             fns: Vec::new(),
+        }
+    }
+
+    /// Add a const to the trait implementation
+    ///
+    /// ```ignore
+    /// generator.impl_for("Foo")
+    ///          .generate_const("BAR", "u8")
+    ///          .with_value(|b| {
+    ///             b.push_parsed("5")?;
+    ///             Ok(())
+    ///          })?;
+    /// // generates:
+    /// impl Foo {
+    ///     const BAR: u8 = 5;
+    /// }
+    pub fn generate_const<'s>(
+        &'s mut self,
+        name: impl Into<String>,
+        ty: impl Into<String>,
+    ) -> GenConst<'s, 'a, P> {
+        GenConst {
+            parent: self,
+            name: name.into(),
+            ty: ty.into(),
         }
     }
 
@@ -59,6 +90,28 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         FnBuilder::new(self, name)
     }
 
+    /// Add a type to the impl
+    ///
+    /// `generator.impl_for("Foo").impl_type("Bar", "u8")` results in code like:
+    ///
+    /// ```ignore
+    /// impl Foo for <struct or enum> {
+    ///     type Bar = u8;
+    /// }
+    /// ```
+    pub fn impl_type(&mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder
+            .ident_str("type")
+            .push_parsed(name)?
+            .punct('=')
+            .push_parsed(value)?
+            .punct(';');
+        self.impl_types.push(builder);
+        Ok(())
+    }
+
+    ///
     /// Modify the generic constraints of a type.
     /// This can be used to add additional type constraints to your implementation.
     ///
@@ -119,6 +172,12 @@ impl<P: Parent> Drop for ImplFor<'_, P> {
 
         builder
             .group(Delimiter::Brace, |builder| {
+                for ty in std::mem::take(&mut self.impl_types) {
+                    builder.append(ty);
+                }
+                for r#const in std::mem::take(&mut self.consts) {
+                    builder.append(r#const);
+                }
                 for (fn_def, fn_body) in std::mem::take(&mut self.fns) {
                     builder.append(fn_def);
                     builder
@@ -171,4 +230,29 @@ fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
         builder.lifetime_str(lt);
     }
     builder.punct('>');
+}
+
+pub struct GenConst<'a, 'b, P: Parent> {
+    parent: &'a mut ImplFor<'b, P>,
+    name: String,
+    ty: String,
+}
+
+impl<'a, 'b, P: Parent> GenConst<'a, 'b, P> {
+    pub fn with_value<F>(self, f: F) -> Result
+    where
+        F: FnOnce(&mut StreamBuilder) -> Result,
+    {
+        let mut builder = StreamBuilder::new();
+        builder
+            .ident_str("const")
+            .push_parsed(self.name)?
+            .punct(':')
+            .push_parsed(self.ty)?
+            .punct('=');
+        f(&mut builder)?;
+        builder.punct(';');
+        self.parent.consts.push(builder);
+        Ok(())
+    }
 }

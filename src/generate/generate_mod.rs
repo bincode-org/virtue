@@ -2,12 +2,14 @@ use super::{GenStruct, Impl, Parent, StreamBuilder};
 use crate::{
     parse::Visibility,
     prelude::{Delimiter, Ident, Span},
+    Result,
 };
 
 /// Builder for generating a module with its contents.
 pub struct GenerateMod<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,
+    uses: Vec<StreamBuilder>,
     vis: Visibility,
     content: StreamBuilder,
 }
@@ -17,9 +19,28 @@ impl<'a, P: Parent> GenerateMod<'a, P> {
         Self {
             parent,
             name: Ident::new(name.into().as_str(), Span::call_site()),
+            uses: Vec::new(),
             vis: Visibility::Default,
             content: StreamBuilder::new(),
         }
+    }
+
+    /// Add a `use ...;` to the current mod
+    ///
+    /// `generator.impl_mod("foo").add_use("bar")` will generate:
+    ///
+    /// ```ignore
+    /// mod foo {
+    ///     use bar;
+    /// }
+    /// ```
+    ///
+    /// This is especially useful with `.add_use("super::*");`, which will pull all parent imports into scope
+    pub fn add_use(&mut self, r#use: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder.ident_str("use").push_parsed(r#use)?.punct(';');
+        self.uses.push(builder);
+        Ok(())
     }
 
     /// Generate a struct with the given name.
@@ -52,7 +73,10 @@ impl<'a, P: Parent> Drop for GenerateMod<'a, P> {
             .ident_str("mod")
             .ident(self.name.clone())
             .group(Delimiter::Brace, |group| {
-                *group = std::mem::take(&mut self.content);
+                for r#use in std::mem::take(&mut self.uses) {
+                    group.append(r#use);
+                }
+                group.append(std::mem::take(&mut self.content));
                 Ok(())
             })
             .unwrap();
