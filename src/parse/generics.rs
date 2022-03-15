@@ -118,8 +118,6 @@ impl Generics {
         &self,
         lifetime: &[String],
     ) -> StreamBuilder {
-        assert!(self.has_lifetime());
-
         let mut result = StreamBuilder::new();
         for (idx, lt) in lifetime.iter().enumerate() {
             result.punct(if idx == 0 { '<' } else { ',' });
@@ -533,6 +531,32 @@ impl GenericConstraints {
         self.constraints.extend(builder.stream.into_iter());
 
         Ok(())
+    }
+
+    /// Push the given constraint onto this stream.
+    ///
+    /// ```ignore
+    /// let mut generic_constraints = GenericConstraints::parse("T: Foo"); // imaginary function
+    ///
+    /// generic_constraints.push_parsed_constraint("u32: SomeTrait");
+    ///
+    /// // generic_constraints is now:
+    /// // `T: Foo, u32: SomeTrait`
+    /// ```
+    pub fn push_parsed_constraint(&mut self, constraint: impl AsRef<str>) -> Result<()> {
+        let mut builder = StreamBuilder::new();
+        if !self.constraints.is_empty() {
+            builder.punct(',');
+        }
+        builder.push_parsed(constraint)?;
+        self.constraints.extend(builder.stream.into_iter());
+
+        Ok(())
+    }
+
+    /// Clear the constraints
+    pub fn clear(&mut self) {
+        self.constraints.clear();
     }
 }
 
