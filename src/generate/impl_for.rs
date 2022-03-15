@@ -138,9 +138,9 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     /// }
     /// ```
     ///
-    pub fn modify_generic_constraints<CB>(&mut self, cb: CB) -> &mut Self
+    pub fn modify_generic_constraints<CB>(&mut self, cb: CB) -> Result<&mut Self>
     where
-        CB: FnOnce(&Generics, &mut GenericConstraints),
+        CB: FnOnce(&Generics, &mut GenericConstraints) -> Result,
     {
         if let Some(generics) = self.generator.generics() {
             let mut constraints = self
@@ -148,10 +148,10 @@ impl<'a, P: Parent> ImplFor<'a, P> {
                 .generic_constraints()
                 .cloned()
                 .unwrap_or_default();
-            cb(generics, &mut constraints);
+            cb(generics, &mut constraints)?;
             self.custom_generic_constraints = Some(constraints)
         }
-        self
+        Ok(self)
     }
 }
 
