@@ -29,7 +29,12 @@ pub enum Error {
     /// Failed to parse the code passed to [`StreamBuilder::push_parsed`].
     ///
     /// [`StreamBuilder::push_parsed`]: struct.StreamBuilder.html#method.push_parsed
-    PushParse(PushParseError),
+    PushParse {
+        /// An optional span. Normally this is `None`, unless `.with_span` is called.
+        span: Option<Span>,
+        /// The internal parse error
+        error: PushParseError,
+    },
 
     /// A custom error thrown by the developer
     Custom {
@@ -42,7 +47,10 @@ pub enum Error {
 
 impl From<PushParseError> for Error {
     fn from(e: PushParseError) -> Self {
-        Self::PushParse(e)
+        Self::PushParse {
+            span: None,
+            error: e,
+        }
     }
 }
 
@@ -85,6 +93,21 @@ impl Error {
             expected: format!("{}, got {:?}", expected, token),
         })
     }
+
+    /// Return a new error that is located at the given span
+    pub fn with_span(mut self, new_span: Span) -> Self {
+        match &mut self {
+            Error::UnknownDataType(span) => *span = new_span,
+            Error::InvalidRustSyntax { span, .. } => *span = new_span,
+            Error::ExpectedIdent(span) => *span = new_span,
+            Error::PushParse { span, .. } => {
+                *span = Some(new_span);
+            }
+            Error::Custom { span, .. } => *span = Some(new_span),
+        }
+
+        self
+    }
 }
 
 // helper functions for the unit tests
@@ -109,10 +132,10 @@ impl fmt::Display for Error {
                 write!(fmt, "Invalid rust syntax, expected {}", expected)
             }
             Self::ExpectedIdent(_) => write!(fmt, "Expected ident"),
-            Self::PushParse(e) => write!(
+            Self::PushParse { error, .. } => write!(
                 fmt,
                 "Invalid code passed to `StreamBuilder::push_parsed`: {:?}",
-                e
+                error
             ),
             Self::Custom { error, .. } => write!(fmt, "{}", error),
         }
@@ -126,10 +149,7 @@ impl Error {
             Self::UnknownDataType(span)
             | Self::ExpectedIdent(span)
             | Self::InvalidRustSyntax { span, .. } => Some(*span),
-            Self::Custom { span, .. } => *span,
-            // PushParseError.error technically has a .span(), but this will be the span in the users derive impl
-            // so we pretend to not have a span
-            Self::PushParse(_) => None,
+            Self::Custom { span, .. } | Self::PushParse { span, .. } => *span,
         };
         self.throw_with_span(maybe_span.unwrap_or_else(Span::call_site))
     }
