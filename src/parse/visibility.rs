@@ -1,6 +1,5 @@
 use super::utils::*;
 use crate::prelude::TokenTree;
-use crate::Result;
 use std::iter::Peekable;
 
 /// The visibility of a struct, enum, field, etc
@@ -14,60 +13,55 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    pub(crate) fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
-        if let Some(TokenTree::Ident(ident)) = input.peek() {
-            if ident_eq(ident, "pub") {
-                // Consume this token
-                assume_ident(input.next());
-
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Self {
+        consume_ident_if(input, "pub")
+            .map(|_| {
                 // check if the next token is `pub(...)`
                 if let Some(TokenTree::Group(_)) = input.peek() {
                     // we just consume the visibility, we're not actually using it for generation
-                    assume_group(input.next());
+                    let _ = input.next();
                 }
-
-                return Ok(Visibility::Pub);
-            }
-        }
-        Ok(Visibility::Default)
+                Visibility::Pub
+            })
+            .unwrap_or(Visibility::Default)
     }
 }
 
 #[test]
-fn test_visibility_try_take() {
+fn test_visibility_take() {
     use crate::token_stream;
 
     assert_eq!(
         Visibility::Default,
-        Visibility::try_take(&mut token_stream("")).unwrap()
+        Visibility::take(&mut token_stream(""))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream("pub")).unwrap()
+        Visibility::take(&mut token_stream("pub"))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream(" pub ")).unwrap(),
+        Visibility::take(&mut token_stream(" pub "))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream("\tpub\t")).unwrap()
+        Visibility::take(&mut token_stream("\tpub\t"))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream("pub(crate)")).unwrap()
+        Visibility::take(&mut token_stream("pub(crate)"))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream(" pub ( crate ) ")).unwrap()
+        Visibility::take(&mut token_stream(" pub ( crate ) "))
     );
     assert_eq!(
         Visibility::Pub,
-        Visibility::try_take(&mut token_stream("\tpub\t(\tcrate\t)\t")).unwrap()
+        Visibility::take(&mut token_stream("\tpub\t(\tcrate\t)\t"))
     );
 
     assert_eq!(
         Visibility::Default,
-        Visibility::try_take(&mut token_stream("pb")).unwrap()
+        Visibility::take(&mut token_stream("pb"))
     );
 }

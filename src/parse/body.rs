@@ -388,7 +388,7 @@ impl UnnamedField {
         let mut result = Vec::new();
         loop {
             let attributes = Attribute::try_take(AttributeLocation::Field, input)?;
-            let vis = Visibility::try_take(input)?;
+            let vis = Visibility::take(input);
 
             let ident = match input.peek() {
                 Some(TokenTree::Ident(_)) => assume_ident(input.next()),
@@ -426,7 +426,7 @@ impl UnnamedField {
         let mut result = Vec::new();
         while input.peek().is_some() {
             let attributes = Attribute::try_take(AttributeLocation::Field, input)?;
-            let vis = Visibility::try_take(input)?;
+            let vis = Visibility::take(input);
 
             let r#type = read_tokens_until_punct(input, &[','])?;
             consume_punct_if(input, ',');

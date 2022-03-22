@@ -2,6 +2,9 @@
 
 use crate::prelude::*;
 
+#[cfg(test)]
+mod function;
+
 mod attributes;
 mod body;
 mod data_type;
@@ -71,7 +74,7 @@ impl Parse {
         let source = &mut input.into_iter().peekable();
 
         let attributes = Attribute::try_take(AttributeLocation::Container, source)?;
-        let visibility = Visibility::try_take(source)?;
+        let visibility = Visibility::take(source);
         let (datatype, name) = DataType::take(source)?;
         let generics = Generics::try_take(source)?;
         let generic_constraints = GenericConstraints::try_take(source)?;

@@ -25,13 +25,13 @@ pub fn assume_punct(t: Option<TokenTree>, punct: char) -> Punct {
 }
 
 pub fn consume_ident(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Option<Ident> {
-    match input.peek() {
-        Some(TokenTree::Ident(_)) => Some(super::utils::assume_ident(input.next())),
-        Some(TokenTree::Group(group)) => {
+    match input.peek()? {
+        TokenTree::Ident(_) => Some(assume_ident(input.next())),
+        TokenTree::Group(group) => {
             // When calling from a macro_rules!, sometimes an ident is defined as :
             // Group { delimiter: None, stream: TokenStream [Ident] }
             let mut stream = group.stream().into_iter();
-            if let Some(TokenTree::Ident(i)) = stream.next() {
+            if let TokenTree::Ident(i) = stream.next()? {
                 if stream.next().is_none() {
                     let _ = input.next();
                     return Some(i);
@@ -41,6 +41,23 @@ pub fn consume_ident(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> O
         }
         _ => None,
     }
+}
+
+pub fn consume_ident_if(
+    input: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    text: &str,
+) -> Option<Ident> {
+    if let Some(TokenTree::Ident(ident)) = input.peek() {
+        if ident_eq(ident, text) {
+            unsafe {
+                match input.next().unwrap_unchecked() {
+                    TokenTree::Ident(i) => return Some(i),
+                    _ => core::hint::unreachable_unchecked(),
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn consume_punct_if(
