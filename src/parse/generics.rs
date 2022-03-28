@@ -40,7 +40,7 @@ impl Generics {
                     match input.peek() {
                         Some(TokenTree::Punct(punct)) if punct.as_char() == '\'' => {
                             result.push(Lifetime::take(input)?.into());
-                            consume_punct_if(input, ',');
+                            consume_punct_if_eq(input, ',');
                         }
                         Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
                             assume_punct(input.next(), '>');
@@ -48,11 +48,11 @@ impl Generics {
                         }
                         Some(TokenTree::Ident(ident)) if ident_eq(ident, "const") => {
                             result.push(ConstGeneric::take(input)?.into());
-                            consume_punct_if(input, ',');
+                            consume_punct_if_eq(input, ',');
                         }
                         Some(TokenTree::Ident(_)) => {
                             result.push(SimpleGeneric::take(input)?.into());
-                            consume_punct_if(input, ',');
+                            consume_punct_if_eq(input, ',');
                         }
                         x => {
                             return Err(Error::InvalidRustSyntax {

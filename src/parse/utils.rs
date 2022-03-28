@@ -43,7 +43,7 @@ pub fn consume_ident(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> O
     }
 }
 
-pub fn consume_ident_if(
+pub fn consume_ident_if_eq(
     input: &mut Peekable<impl Iterator<Item = TokenTree>>,
     text: &str,
 ) -> Option<Ident> {
@@ -60,7 +60,7 @@ pub fn consume_ident_if(
     None
 }
 
-pub fn consume_punct_if(
+pub fn consume_punct_if_eq(
     input: &mut Peekable<impl Iterator<Item = TokenTree>>,
     punct: char,
 ) -> Option<Punct> {

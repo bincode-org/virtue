@@ -179,7 +179,7 @@ impl EnumBody {
                 token => return Error::wrong_token(token, "group, comma or ="),
             }
 
-            consume_punct_if(stream, ',');
+            consume_punct_if_eq(stream, ',');
 
             variants.push(EnumVariant {
                 name: ident,
@@ -407,7 +407,7 @@ impl UnnamedField {
                 token => return Error::wrong_token(token, ":"),
             }
             let r#type = read_tokens_until_punct(input, &[','])?;
-            consume_punct_if(input, ',');
+            consume_punct_if_eq(input, ',');
             result.push((
                 ident,
                 Self {
@@ -429,7 +429,7 @@ impl UnnamedField {
             let vis = Visibility::take(input);
 
             let r#type = read_tokens_until_punct(input, &[','])?;
-            consume_punct_if(input, ',');
+            consume_punct_if_eq(input, ',');
             result.push(Self {
                 vis,
                 r#type,

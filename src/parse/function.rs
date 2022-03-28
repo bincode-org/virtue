@@ -1,8 +1,7 @@
-
 // TODO:
 // - Add documentation
 // - Add more tests
-// - Standardized user facing API.
+// - Standardize user facing API.
 
 use super::utils::*;
 use super::*;
@@ -22,27 +21,26 @@ struct Function {
     // where_cl : WhereClause,
     // ret_ty : ReturnType,
     // body: FnBody,
-
     #[allow(dead_code)]
     rest: TokenStream, // For debugging purposes
 }
 
 impl Function {
-    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Self {
+    pub(crate) fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         let visibility = Visibility::take(input);
-        let is_async = consume_ident_if(input, "async").is_some();
-        let is_unsafe = consume_ident_if(input, "unsafe").is_some();
+        let is_async = consume_ident_if_eq(input, "async").is_some();
+        let is_unsafe = consume_ident_if_eq(input, "unsafe").is_some();
 
         // Ignore everything until `fn` keyword
         let _ = input.skip_while(|tt| tt.to_string() != "fn").next();
 
         let name = consume_ident(input)
-            .expect("Expected: `fn <name>`")
+            .ok_or(Error::ExpectedIdent(Span::call_site()))?
             .to_string();
 
-        let generics = Generics::try_take(input).unwrap();
+        let generics = Generics::try_take(input)?;
 
-        Self {
+        Ok(Self {
             visibility,
             is_async,
             is_unsafe,
@@ -51,26 +49,35 @@ impl Function {
 
             // For debugging purposes
             rest: input.collect(),
-        }
+        })
     }
 }
 
 #[cfg(test)]
-macro_rules! info { [$($t:tt)*] => { Function::take(&mut crate::token_stream(stringify!($($t)*))) }; }
+macro_rules! token_stream { [$($t:tt)*] => { Function::try_take(&mut crate::token_stream(stringify!($($t)*))).unwrap() }; }
 
 #[test]
 #[cfg(test)]
 fn playground() {
-    let foo = info! {
-        pub fn foo<'a, T: Default>(arg: &'a T) -> () {}
+    let foo = token_stream! {
+        pub fn foo<'a, 'b, T>(
+            arg2: &'a [T],
+            // &arg1: &'b u8,
+            // mut arg3: String,
+            // arg4: impl AsRef<[u8]>,
+        ) -> ()
+        where
+            T: Default,
+        {
+            println!("{}", "Hello, world!");
+        }
     };
     println!("{:#?}", foo);
 }
 
 #[test]
-#[cfg(test)]
 fn test_simple() {
-    let func = info! {
+    let func = token_stream! {
         pub async unsafe fn foo() {}
     };
     assert_eq!(func.visibility, Visibility::Pub);
@@ -81,7 +88,7 @@ fn test_simple() {
 
     // -------------------------------------------
 
-    let func = info! {
+    let func = token_stream! {
         pub fn foo() {}
     };
     assert_eq!(func.visibility, Visibility::Pub);
@@ -89,7 +96,7 @@ fn test_simple() {
 
     // -------------------------------------------
 
-    let func = info! {
+    let func = token_stream! {
         extern "C" fn bar() {}
     };
     assert_eq!(func.visibility, Visibility::Default);

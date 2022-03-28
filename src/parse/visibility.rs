@@ -14,7 +14,7 @@ pub enum Visibility {
 
 impl Visibility {
     pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Self {
-        consume_ident_if(input, "pub")
+        consume_ident_if_eq(input, "pub")
             .map(|_| {
                 // check if the next token is `pub(...)`
                 if let Some(TokenTree::Group(_)) = input.peek() {
@@ -31,14 +31,8 @@ impl Visibility {
 fn test_visibility_take() {
     use crate::token_stream;
 
-    assert_eq!(
-        Visibility::Default,
-        Visibility::take(&mut token_stream(""))
-    );
-    assert_eq!(
-        Visibility::Pub,
-        Visibility::take(&mut token_stream("pub"))
-    );
+    assert_eq!(Visibility::Default, Visibility::take(&mut token_stream("")));
+    assert_eq!(Visibility::Pub, Visibility::take(&mut token_stream("pub")));
     assert_eq!(
         Visibility::Pub,
         Visibility::take(&mut token_stream(" pub "))

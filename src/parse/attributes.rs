@@ -46,7 +46,7 @@ impl Attribute {
     ) -> Result<Vec<Self>> {
         let mut result = Vec::new();
 
-        while let Some(punct) = consume_punct_if(input, '#') {
+        while let Some(punct) = consume_punct_if_eq(input, '#') {
             match input.peek() {
                 Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Bracket => {
                     let group = assume_group(input.next());
