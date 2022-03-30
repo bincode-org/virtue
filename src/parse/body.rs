@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use super::attributes::AttributeLocation;
 use super::{utils::*, Attribute, Visibility};
 use crate::prelude::{Delimiter, Ident, Literal, Span, TokenTree};
@@ -40,13 +41,18 @@ impl StructBody {
 
 #[test]
 fn test_struct_body_take() {
-    use crate::token_stream;
+    use super::DataType;
+    use crate::tokenstream;
 
-    let stream = &mut token_stream(
-        "struct Foo { pub bar: u8, pub(crate) baz: u32, bla: Vec<Box<dyn Future<Output = ()>>> }",
-    );
-    let (data_type, ident) = super::DataType::take(stream).unwrap();
-    assert_eq!(data_type, super::DataType::Struct);
+    let stream = tokenstream! {
+        struct Foo {
+            pub bar: u8,
+            pub(crate) baz: u32,
+            bla: Vec<Box<dyn Future<Output = ()>>>,
+        }
+    };
+    let (data_type, ident) = DataType::take(stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
 
@@ -64,13 +70,16 @@ fn test_struct_body_take() {
     let (ident, field) = body.fields.get(2).unwrap();
     assert_eq!(ident.unwrap(), "bla");
     assert_eq!(field.vis, Visibility::Default);
-    assert_eq!(field.type_string(), "Vec<Box<dynFuture<Output=()>>>");
-
-    let stream = &mut token_stream(
-        "struct Foo ( pub u8, pub(crate) u32, Vec<Box<dyn Future<Output = ()>>> )",
+    assert_eq!(
+        field.type_string(),
+        "Vec < Box < dyn Future < Output = () >> >"
     );
-    let (data_type, ident) = super::DataType::take(stream).unwrap();
-    assert_eq!(data_type, super::DataType::Struct);
+
+    let stream = tokenstream! {
+        struct Foo ( pub u8, pub(crate) u32, Vec<Box<dyn Future<Output = ()>>> ),
+    };
+    let (data_type, ident) = DataType::take(stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
 
@@ -89,27 +98,57 @@ fn test_struct_body_take() {
     let (ident, field) = body.fields.get(2).unwrap();
     assert!(ident.is_none());
     assert_eq!(field.vis, Visibility::Default);
-    assert_eq!(field.type_string(), "Vec<Box<dynFuture<Output=()>>>");
+    assert_eq!(
+        field.type_string(),
+        "Vec < Box < dyn Future < Output = () >> >"
+    );
 
-    let stream = &mut token_stream("struct Foo;");
-    let (data_type, ident) = super::DataType::take(stream).unwrap();
-    assert_eq!(data_type, super::DataType::Struct);
+    let stream = tokenstream!(
+        struct Foo;
+    );
+    let (data_type, ident) = DataType::take(stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
     assert_eq!(body.fields.len(), 0);
 
-    let stream = &mut token_stream("struct Foo {}");
-    let (data_type, ident) = super::DataType::take(stream).unwrap();
-    assert_eq!(data_type, super::DataType::Struct);
+    let stream = tokenstream!(
+        struct Foo {}
+    );
+    let (data_type, ident) = DataType::take(stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
     assert_eq!(body.fields.len(), 0);
 
-    let stream = &mut token_stream("struct Foo ()");
-    let (data_type, ident) = super::DataType::take(stream).unwrap();
-    assert_eq!(data_type, super::DataType::Struct);
+    let stream = tokenstream!(struct Foo ());
+    let (data_type, ident) = DataType::take(stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
     assert_eq!(ident, "Foo");
+    let body = StructBody::take(stream).unwrap();
     assert_eq!(body.fields.len(), 0);
+
+    let qux_stream = tokenstream! {
+        struct Qux<'a> {
+            bytes: &'a [u8],
+            str_slice: &'a str,
+        }
+    };
+    let (data_type, ident) = DataType::take(qux_stream).unwrap();
+    assert_eq!(data_type, DataType::Struct);
+    assert_eq!(ident, "Qux");
+    let generic = super::Generics::try_take(qux_stream).unwrap();
+    assert!(generic.is_some());
+
+    let body = StructBody::take(qux_stream).unwrap();
+
+    let (ident, field) = body.fields.get(0).unwrap();
+    assert_eq!(ident.unwrap(), "bytes");
+    assert_eq!(field.type_string(), "& 'a [u8]");
+
+    let (ident, field) = body.fields.get(1).unwrap();
+    assert_eq!(ident.unwrap(), "str_slice");
+    assert_eq!(field.type_string(), "& 'a str");
 }
 
 /// The body of an enum
@@ -443,7 +482,9 @@ impl UnnamedField {
     ///
     /// [`type`]: #structfield.type
     pub fn type_string(&self) -> String {
-        self.r#type.iter().map(|t| t.to_string()).collect()
+        let mut ts = crate::prelude::TokenStream::new();
+        ts.extend(self.r#type.clone());
+        ts.to_string()
     }
 
     /// Return the span of [`type`].

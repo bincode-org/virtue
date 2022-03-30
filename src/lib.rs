@@ -39,3 +39,11 @@ pub(crate) fn token_stream(
         .unwrap_or_else(|e| panic!("Could not parse code: {:?}\n{:?}", s, e));
     stream.into_iter().peekable()
 }
+
+#[allow(unused)]
+macro_rules! tokenstream {
+    [$($tt:tt)*] => { &mut crate::token_stream(stringify!($($tt)*)) };
+}
+
+#[cfg(test)]
+pub(crate) use tokenstream;
