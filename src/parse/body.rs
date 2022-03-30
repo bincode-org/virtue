@@ -233,16 +233,24 @@ impl EnumBody {
 
 #[test]
 fn test_enum_body_take() {
-    use crate::token_stream;
+    use crate::tokenstream;
 
-    let stream = &mut token_stream("enum Foo { }");
+    let stream = tokenstream!(
+        enum Foo {}
+    );
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Enum);
     assert_eq!(ident, "Foo");
     let body = EnumBody::take(stream).unwrap();
     assert_eq!(0, body.variants.len());
 
-    let stream = &mut token_stream("enum Foo { Bar, Baz(u8), Blah { a: u32, b: u128 } }");
+    let stream = tokenstream!(
+        enum Foo {
+            Bar,
+            Baz(u8),
+            Blah { a: u32, b: u128 },
+        }
+    );
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Enum);
     assert_eq!(ident, "Foo");

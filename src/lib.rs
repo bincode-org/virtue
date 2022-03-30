@@ -30,9 +30,7 @@ pub mod prelude {
 }
 
 #[cfg(test)]
-pub(crate) fn token_stream(
-    s: &str,
-) -> std::iter::Peekable<impl Iterator<Item = proc_macro2::TokenTree>> {
+fn token_stream(s: &str) -> std::iter::Peekable<impl Iterator<Item = proc_macro2::TokenTree>> {
     use std::str::FromStr;
 
     let stream = proc_macro2::TokenStream::from_str(s)

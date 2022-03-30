@@ -280,7 +280,7 @@ impl From<ConstGeneric> for Generic {
 
 #[test]
 fn test_generics_try_take() {
-    use crate::token_stream;
+    use crate::{token_stream, tokenstream};
 
     assert!(Generics::try_take(&mut token_stream("")).unwrap().is_none());
     assert!(Generics::try_take(&mut token_stream("foo"))
@@ -290,7 +290,7 @@ fn test_generics_try_take() {
         .unwrap()
         .is_none());
 
-    let stream = &mut token_stream("struct Foo<'a, T>()");
+    let stream = tokenstream!(struct Foo<'a, T>());
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
@@ -299,7 +299,7 @@ fn test_generics_try_take() {
     assert_eq!(generics[0].ident(), "a");
     assert_eq!(generics[1].ident(), "T");
 
-    let stream = &mut token_stream("struct Foo<A, B>()");
+    let stream = tokenstream!(struct Foo<A, B>());
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
@@ -308,7 +308,7 @@ fn test_generics_try_take() {
     assert_eq!(generics[0].ident(), "A");
     assert_eq!(generics[1].ident(), "B");
 
-    let stream = &mut token_stream("struct Foo<'a, T: Display>()");
+    let stream = tokenstream!(struct Foo<'a, T: Display>());
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
@@ -318,7 +318,7 @@ fn test_generics_try_take() {
     assert_eq!(generics[0].ident(), "a");
     assert_eq!(generics[1].ident(), "T");
 
-    let stream = &mut token_stream("struct Foo<'a, T: for<'a> Bar<'a> + 'static>()");
+    let stream = tokenstream!(struct Foo<'a, T: for<'a> Bar<'a> + 'static>());
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
@@ -327,8 +327,8 @@ fn test_generics_try_take() {
     assert_eq!(generics[0].ident(), "a");
     assert_eq!(generics[1].ident(), "T");
 
-    let stream = &mut token_stream(
-        "struct Baz<T: for<'a> Bar<'a, for<'b> Bar<'b, for<'c> Bar<'c, u32>>>> {}",
+    let stream = tokenstream!(
+        struct Baz<T: for<'a> Bar<'a, for<'b> Bar<'b, for<'c> Bar<'c, u32>>>> {}
     );
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
@@ -338,7 +338,7 @@ fn test_generics_try_take() {
     assert_eq!(generics.len(), 1);
     assert_eq!(generics[0].ident(), "T");
 
-    let stream = &mut token_stream("struct Baz<()> {}");
+    let stream = tokenstream!(struct Baz<()> {});
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Baz");
@@ -346,7 +346,7 @@ fn test_generics_try_take() {
         .unwrap_err()
         .is_invalid_rust_syntax());
 
-    let stream = &mut token_stream("struct Bar<A: FnOnce(&'static str) -> SomeStruct, B>");
+    let stream = tokenstream!(struct Bar<A: FnOnce(&'static str) -> SomeStruct, B>);
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Bar");
@@ -563,34 +563,42 @@ impl GenericConstraints {
 #[test]
 fn test_generic_constraints_try_take() {
     use super::{DataType, StructBody, Visibility};
-    use crate::token_stream;
+    use crate::tokenstream;
 
-    let stream = &mut token_stream("struct Foo where Foo: Bar { }");
+    let stream = tokenstream!(
+        struct Foo
+        where
+            Foo: Bar, {}
+    );
     DataType::take(stream).unwrap();
     assert!(GenericConstraints::try_take(stream).unwrap().is_some());
 
-    let stream = &mut token_stream("struct Foo { }");
+    let stream = tokenstream!(
+        struct Foo {}
+    );
     DataType::take(stream).unwrap();
     assert!(GenericConstraints::try_take(stream).unwrap().is_none());
 
-    let stream = &mut token_stream("struct Foo where Foo: Bar(Foo)");
+    let stream = tokenstream!(struct Foo where Foo: Bar(Foo));
     DataType::take(stream).unwrap();
     assert!(GenericConstraints::try_take(stream).unwrap().is_some());
 
-    let stream = &mut token_stream("struct Foo()");
+    let stream = tokenstream!(struct Foo());
     DataType::take(stream).unwrap();
     assert!(GenericConstraints::try_take(stream).unwrap().is_none());
 
-    let stream = &mut token_stream("struct Foo()");
+    let stream = tokenstream!(struct Foo());
     assert!(GenericConstraints::try_take(stream).unwrap().is_none());
 
-    let stream = &mut token_stream("{}");
+    let stream = tokenstream!({});
     assert!(GenericConstraints::try_take(stream).unwrap().is_none());
 
-    let stream = &mut token_stream("");
+    let stream = tokenstream!("");
     assert!(GenericConstraints::try_take(stream).unwrap().is_none());
 
-    let stream = &mut token_stream("pub(crate) struct Test<T: Encode> {}");
+    let stream = tokenstream!(
+        pub(crate) struct Test<T: Encode> {}
+    );
     assert_eq!(Visibility::Pub, Visibility::take(stream));
     let (data_type, ident) = DataType::take(stream).unwrap();
     assert_eq!(data_type, DataType::Struct);

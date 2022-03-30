@@ -75,9 +75,11 @@ impl Attribute {
 
 #[test]
 fn test_attributes_try_take() {
-    use crate::token_stream;
+    use crate::tokenstream;
 
-    let stream = &mut token_stream("struct Foo;");
+    let stream = tokenstream!(
+        struct Foo;
+    );
     assert!(Attribute::try_take(AttributeLocation::Container, stream)
         .unwrap()
         .is_empty());
@@ -86,7 +88,10 @@ fn test_attributes_try_take() {
         x => panic!("Expected ident, found {:?}", x),
     }
 
-    let stream = &mut token_stream("#[cfg(test)] struct Foo;");
+    let stream = tokenstream!(
+        #[cfg(test)]
+        struct Foo;
+    );
     assert!(!Attribute::try_take(AttributeLocation::Container, stream)
         .unwrap()
         .is_empty());

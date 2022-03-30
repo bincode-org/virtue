@@ -54,12 +54,12 @@ impl Function {
 }
 
 #[cfg(test)]
-macro_rules! token_stream { [$($t:tt)*] => { Function::try_take(&mut crate::token_stream(stringify!($($t)*))).unwrap() }; }
+macro_rules! fts { [$($t:tt)*] => { Function::try_take(crate::tokenstream!($($t)*)).unwrap() }; }
 
 #[test]
 #[cfg(test)]
 fn playground() {
-    let foo = token_stream! {
+    let foo = fts! {
         pub fn foo<'a, 'b, T>(
             arg2: &'a [T],
             // &arg1: &'b u8,
@@ -77,7 +77,7 @@ fn playground() {
 
 #[test]
 fn test_simple() {
-    let func = token_stream! {
+    let func = fts! {
         pub async unsafe fn foo() {}
     };
     assert_eq!(func.visibility, Visibility::Pub);
@@ -88,7 +88,7 @@ fn test_simple() {
 
     // -------------------------------------------
 
-    let func = token_stream! {
+    let func = fts! {
         pub fn foo() {}
     };
     assert_eq!(func.visibility, Visibility::Pub);
@@ -96,7 +96,7 @@ fn test_simple() {
 
     // -------------------------------------------
 
-    let func = token_stream! {
+    let func = fts! {
         extern "C" fn bar() {}
     };
     assert_eq!(func.visibility, Visibility::Default);

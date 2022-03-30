@@ -29,7 +29,7 @@ impl DataType {
 
 #[test]
 fn test_datatype_take() {
-    use crate::token_stream;
+    use crate::{token_stream, tokenstream};
 
     fn validate_output_eq(input: &str, expected_dt: DataType, expected_ident: &str) {
         let (dt, ident) = DataType::take(&mut token_stream(input)).unwrap_or_else(|e| {
@@ -59,9 +59,11 @@ fn test_datatype_take() {
     validate_output_eq("struct Foo { bar: u32, baz: u32 }", DataType::Struct, "Foo");
     validate_output_eq("struct Foo<'a, T> { bar: &'a T }", DataType::Struct, "Foo");
 
-    assert!(DataType::take(&mut token_stream("fn foo() {}"))
-        .unwrap_err()
-        .is_unknown_data_type());
+    assert!(DataType::take(tokenstream!(
+        fn foo() {}
+    ))
+    .unwrap_err()
+    .is_unknown_data_type());
 
     assert!(DataType::take(&mut token_stream("() {}"))
         .unwrap_err()
