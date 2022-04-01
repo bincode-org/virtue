@@ -2,6 +2,7 @@ use super::utils::*;
 use crate::generate::StreamBuilder;
 use crate::prelude::{Ident, TokenTree};
 use crate::{Error, Result};
+use std::convert::TryFrom;
 use std::iter::Peekable;
 use std::ops::{Deref, DerefMut};
 
@@ -42,10 +43,6 @@ impl Generics {
                             result.push(Lifetime::take(input)?.into());
                             consume_punct_if_eq(input, ',');
                         }
-                        Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
-                            assume_punct(input.next(), '>');
-                            break;
-                        }
                         Some(TokenTree::Ident(ident)) if ident_eq(ident, "const") => {
                             result.push(ConstGeneric::take(input)?.into());
                             consume_punct_if_eq(input, ',');
@@ -53,6 +50,10 @@ impl Generics {
                         Some(TokenTree::Ident(_)) => {
                             result.push(SimpleGeneric::take(input)?.into());
                             consume_punct_if_eq(input, ',');
+                        }
+                        Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {
+                            assume_punct(input.next(), '>');
+                            break;
                         }
                         x => {
                             return Err(Error::InvalidRustSyntax {
@@ -208,6 +209,31 @@ pub enum Generic {
     Const(ConstGeneric),
 }
 
+impl TryFrom<&str> for Generic {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let mut b = StreamBuilder::new();
+        b.push_parsed(value)?;
+        let ref mut input = b.stream.into_iter().peekable();
+        Ok(match input.peek() {
+            Some(TokenTree::Punct(punct)) if punct.as_char() == '\'' => {
+                Lifetime::take(input)?.into()
+            }
+            Some(TokenTree::Ident(ident)) if ident_eq(ident, "const") => {
+                ConstGeneric::take(input)?.into()
+            }
+            Some(TokenTree::Ident(_)) => SimpleGeneric::take(input)?.into(),
+            x => {
+                return Err(Error::InvalidRustSyntax {
+                    span: crate::prelude::Span::call_site(),
+                    expected: format!("', > or an ident, got {:?}", x),
+                });
+            }
+        })
+    }
+}
+
 impl Generic {
     fn is_lifetime(&self) -> bool {
         matches!(self, Generic::Lifetime(_))
@@ -276,6 +302,22 @@ impl From<ConstGeneric> for Generic {
     fn from(gen: ConstGeneric) -> Self {
         Self::Const(gen)
     }
+}
+
+#[test]
+fn test_generic_from_str() {
+    assert!(matches!(
+        Generic::try_from("'a").unwrap(),
+        Generic::Lifetime(_)
+    ));
+    assert!(matches!(
+        Generic::try_from("T: Default + Debug").unwrap(),
+        Generic::Generic(_)
+    ));
+    assert!(matches!(
+        Generic::try_from("const N: usize").unwrap(),
+        Generic::Const(_)
+    ));
 }
 
 #[test]
