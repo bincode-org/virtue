@@ -9,6 +9,7 @@ pub struct FnBuilder<'a, P> {
     parent: &'a mut P,
     name: String,
 
+    is_async: bool,
     lifetimes: Vec<(String, Vec<String>)>,
     generics: Vec<(String, Vec<String>)>,
     self_arg: FnSelfArg,
@@ -22,6 +23,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         Self {
             parent,
             name: name.into(),
+            is_async: false,
             lifetimes: Vec::new(),
             generics: Vec::new(),
             self_arg: FnSelfArg::None,
@@ -44,6 +46,22 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     #[must_use]
     pub fn with_lifetime(mut self, name: impl Into<String>) -> Self {
         self.lifetimes.push((name.into(), Vec::new()));
+        self
+    }
+
+    /// Make the function async
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator
+    ///     .r#impl()
+    ///     .generate_fn("foo") // fn foo()
+    ///     .as_async(); // async fn foo()
+    /// ```
+    #[must_use]
+    pub fn as_async(mut self) -> Self {
+        self.is_async = true;
         self
     }
 
@@ -199,6 +217,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         let FnBuilder {
             parent,
             name,
+            is_async,
             lifetimes,
             generics,
             self_arg,
@@ -212,6 +231,9 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         // function name; `fn name`
         if vis == Visibility::Pub {
             builder.ident_str("pub");
+        }
+        if is_async {
+            builder.ident_str("async");
         }
         builder.ident_str("fn");
         builder.ident_str(name);
