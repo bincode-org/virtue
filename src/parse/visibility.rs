@@ -4,7 +4,7 @@ use crate::Result;
 use std::iter::Peekable;
 
 /// The visibility of a struct, enum, field, etc
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Visibility {
     /// Default visibility. Most items are private by default.
     Default,
@@ -15,8 +15,8 @@ pub enum Visibility {
 
 impl Visibility {
     pub(crate) fn try_take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
-        if let Some(TokenTree::Ident(ident)) = input.peek() {
-            if ident_eq(ident, "pub") {
+        match input.peek() {
+            Some(TokenTree::Ident(ident)) if ident_eq(ident, "pub") => {
                 // Consume this token
                 assume_ident(input.next());
 
@@ -26,10 +26,29 @@ impl Visibility {
                     assume_group(input.next());
                 }
 
-                return Ok(Visibility::Pub);
+                Ok(Visibility::Pub)
             }
+            Some(TokenTree::Group(group)) => {
+                // sometimes this is a group instead of an ident
+                // e.g. when used in `bitflags! {}`
+                let mut iter = group.stream().into_iter();
+                match (iter.next(), iter.next()) {
+                    (Some(TokenTree::Ident(ident)), None) if ident_eq(&ident, "pub") => {
+                        // Consume this token
+                        assume_group(input.next());
+
+                        // check if the next token is `pub(...)`
+                        if let Some(TokenTree::Group(_)) = input.peek() {
+                            // we just consume the visibility, we're not actually using it for generation
+                            assume_group(input.next());
+                        }
+                        Ok(Visibility::Pub)
+                    }
+                    _ => Ok(Visibility::Default),
+                }
+            }
+            _ => Ok(Visibility::Default),
         }
-        Ok(Visibility::Default)
     }
 }
 

@@ -12,3 +12,6 @@ readme = "README.md"
 
 [dev-dependencies]
 proc-macro2 = "1.0"
+
+[workspace]
+members = ["test", "test/derive"]
