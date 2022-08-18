@@ -47,6 +47,7 @@ use crate::{prelude::*, Error};
 pub fn parse_tagged_attribute(group: &Group, prefix: &str) -> Result<Option<Vec<ParsedAttribute>>> {
     let stream = &mut group.stream().into_iter();
     if let Some(TokenTree::Ident(attribute_ident)) = stream.next() {
+        #[allow(clippy::cmp_owned)] // clippy is wrong
         if attribute_ident.to_string() == prefix {
             if let Some(TokenTree::Group(group)) = stream.next() {
                 let mut result = Vec::new();

@@ -355,6 +355,21 @@ fn test_generics_try_take() {
     assert_eq!(generics.len(), 2);
     assert_eq!(generics[0].ident(), "A");
     assert_eq!(generics[1].ident(), "B");
+
+    let stream = &mut token_stream("struct Bar<A = ()>");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Struct);
+    assert_eq!(ident, "Bar");
+    let generics = Generics::try_take(stream).unwrap().unwrap();
+    dbg!(&generics);
+    assert_eq!(generics.len(), 1);
+    if let Generic::Generic(generic) = &generics[0] {
+        assert_eq!(generic.ident, "A");
+        assert_eq!(generic.default_value.len(), 1);
+        assert_eq!(generic.default_value[0].to_string(), "()");
+    } else {
+        panic!("Expected simple generic, got {:?}", generics[0]);
+    }
 }
 
 /// a lifetime generic parameter, e.g. `struct Foo<'a> { ... }`
@@ -386,7 +401,7 @@ impl Lifetime {
 
     #[cfg(test)]
     fn is_ident(&self, s: &str) -> bool {
-        self.ident.to_string() == s
+        self.ident == s
     }
 }
 
@@ -412,22 +427,37 @@ fn test_lifetime_take() {
 
 /// a simple generic parameter, e.g. `struct Foo<F> { .. }`
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SimpleGeneric {
-    ident: Ident,
-    constraints: Vec<TokenTree>,
+    /// The ident of this generic
+    pub ident: Ident,
+    /// The constraints of this generic, e.g. `F: SomeTrait`
+    pub constraints: Vec<TokenTree>,
+    /// The default value of this generic, e.g. `F = ()`
+    pub default_value: Vec<TokenTree>,
 }
 
 impl SimpleGeneric {
     pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         let ident = assume_ident(input.next());
         let mut constraints = Vec::new();
+        let mut default_value = Vec::new();
         if let Some(TokenTree::Punct(punct)) = input.peek() {
-            if punct.as_char() == ':' {
+            let punct_char = punct.as_char();
+            if punct_char == ':' {
                 assume_punct(input.next(), ':');
                 constraints = read_tokens_until_punct(input, &['>', ','])?;
             }
+            if punct_char == '=' {
+                assume_punct(input.next(), '=');
+                default_value = read_tokens_until_punct(input, &['>', ','])?;
+            }
         }
-        Ok(Self { ident, constraints })
+        Ok(Self {
+            ident,
+            constraints,
+            default_value,
+        })
     }
 
     /// The name of this generic, e.g. `T`
