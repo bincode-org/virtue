@@ -1,14 +1,12 @@
 [package]
 name = "virtue"
-version = "0.0.8"
+version = "0.0.9"
 edition = "2018"
 description = "A sinless derive macro helper"
 license = "MIT"
 documentation = "https://docs.rs/virtue"
 repository = "https://github.com/bincode-org/virtue"
 readme = "README.md"
-
-[dependencies]
 
 [dev-dependencies]
 proc-macro2 = "1.0"
