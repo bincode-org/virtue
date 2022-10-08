@@ -167,6 +167,20 @@ impl EnumBody {
                         Some(TokenTree::Literal(lit)) => {
                             fields = Fields::Integer(lit);
                         }
+                        Some(TokenTree::Punct(p)) if p.as_char() == '-' => match stream.next() {
+                            Some(TokenTree::Literal(lit)) => {
+                                fields = match lit.to_string().parse::<i64>() {
+                                    Ok(val) => Fields::Integer(Literal::i64_unsuffixed(-val)),
+                                    Err(_) => {
+                                        return Err(Error::custom_at(
+                                            "parse::<i64> failed",
+                                            lit.span(),
+                                        ))
+                                    }
+                                };
+                            }
+                            token => return Error::wrong_token(token.as_ref(), "literal"),
+                        },
                         token => return Error::wrong_token(token.as_ref(), "literal"),
                     }
                 }
@@ -227,6 +241,19 @@ fn test_enum_body_take() {
     let (ident, field) = body.variants[2].fields.get(1).unwrap();
     assert_eq!(ident.unwrap(), "b");
     assert_eq!(field.type_string(), "u128");
+
+    let stream = &mut token_stream("enum Foo { Bar = -1, Baz = 2 }");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Enum);
+    assert_eq!(ident, "Foo");
+    let body = EnumBody::take(stream).unwrap();
+    assert_eq!(2, body.variants.len());
+
+    assert_eq!(body.variants[0].name, "Bar");
+    assert_eq!(body.variants[0].fields.get_integer(), Some(-1));
+
+    assert_eq!(body.variants[1].name, "Baz");
+    assert_eq!(body.variants[1].fields.get_integer(), Some(2));
 }
 
 /// A variant of an enum
@@ -370,6 +397,13 @@ impl Fields {
             Self::Struct(fields) => fields.get(index).map(|(ident, field)| (Some(ident), field)),
             Self::Unit => None,
             Self::Integer(_) => None,
+        }
+    }
+
+    pub fn get_integer(&self) -> Option<i64> {
+        match self {
+            Self::Integer(i) => Some(i.to_string().parse().unwrap()),
+            _ => None,
         }
     }
 }
