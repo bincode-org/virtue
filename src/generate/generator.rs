@@ -90,12 +90,12 @@ impl Generator {
     }
 
     /// Export the current stream to a file, making it very easy to debug the output of a derive macro.
-    /// This will try to find rust's `target` file, and write `target/<name>_<file_postfix>.rs`.
+    /// This will try to find rust's `target` directory, and write `target/generated/<crate_name>/<name>_<file_postfix>.rs`.
     ///
     /// Will return `true` if the file is written, `false` otherwise.
     ///
-    /// The outputted file is unformatted. Use `cargo fmt -- target/<file>.rs` to format the file.
-    pub fn export_to_file(&self, file_postfix: &str) -> bool {
+    /// The outputted file is unformatted. Use `cargo fmt -- target/generated/<crate_name>/<file>.rs` to format the file.
+    pub fn export_to_file(&self, crate_name: &str, file_postfix: &str) -> bool {
         use std::io::Write;
 
         if let Ok(var) = std::env::var("CARGO_MANIFEST_DIR") {
@@ -105,6 +105,11 @@ impl Generator {
                     let mut path = path.clone();
                     path.push("target");
                     if path.exists() {
+                        path.push("generated");
+                        path.push(crate_name);
+                        if std::fs::create_dir_all(&path).is_err() {
+                            return false;
+                        }
                         path.push(format!("{}_{}.rs", self.target_name(), file_postfix));
                         if let Ok(mut file) = std::fs::File::create(path) {
                             let _ = file.write_all(self.stream.stream.to_string().as_bytes());
