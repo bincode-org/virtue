@@ -29,14 +29,14 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         }
     }
 
-    pub(super) fn new_with_lifetimes<ITER, I, T>(
+    pub(super) fn new_with_lifetimes<ITER, T>(
         generator: &'a mut P,
         trait_name: T,
         lifetimes: ITER,
     ) -> Self
     where
-        ITER: IntoIterator<Item = I>,
-        I: Into<String>,
+        ITER: IntoIterator,
+        ITER::Item: Into<String>,
         T: Into<String>,
     {
         Self {
