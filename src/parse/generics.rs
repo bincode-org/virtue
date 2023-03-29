@@ -475,7 +475,7 @@ pub struct ConstGeneric {
 }
 
 impl ConstGeneric {
-    pub fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
+    pub(crate) fn take(input: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<Self> {
         let const_token = assume_ident(input.next());
         let ident = assume_ident(input.next());
         let mut constraints = Vec::new();
