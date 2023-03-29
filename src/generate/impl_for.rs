@@ -62,7 +62,7 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     ///          })?;
     /// # Ok::<_, virtue::Error>(())
     /// ```
-    /// 
+    ///
     /// Generates:
     /// ```ignore
     /// impl Foo for <struct or enum> {
@@ -257,7 +257,7 @@ impl<'a, 'b, P: Parent> GenConst<'a, 'b, P> {
     ///          })?;
     /// # Ok::<_, virtue::Error>(())
     /// ```
-    /// 
+    ///
     /// Generates:
     /// ```ignore
     /// impl Foo for <struct or enum> {
