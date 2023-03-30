@@ -361,8 +361,10 @@ fn test_generics_try_take() {
 /// a lifetime generic parameter, e.g. `struct Foo<'a> { ... }`
 #[derive(Debug, Clone)]
 pub struct Lifetime {
-    ident: Ident,
-    constraint: Vec<TokenTree>,
+    /// The ident of this lifetime
+    pub ident: Ident,
+    /// Any constraints that this lifetime may have
+    pub constraint: Vec<TokenTree>,
 }
 
 impl Lifetime {
@@ -538,7 +540,11 @@ impl GenericConstraints {
         constraint: impl AsRef<str>,
     ) -> Result<()> {
         let mut builder = StreamBuilder::new();
-        if !self.constraints.is_empty() {
+        let last_constraint_was_comma = self.constraints.last().map_or(
+            false,
+            |l| matches!(l, TokenTree::Punct(c) if c.as_char() == ','),
+        );
+        if !self.constraints.is_empty() && !last_constraint_was_comma {
             builder.punct(',');
         }
         builder.ident(generic.ident.clone());
