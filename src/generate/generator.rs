@@ -71,14 +71,14 @@ impl Generator {
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
     /// ```
-    pub fn impl_for_with_lifetimes<ITER, I, T>(
+    pub fn impl_for_with_lifetimes<ITER, T>(
         &mut self,
         trait_name: T,
         lifetimes: ITER,
     ) -> ImplFor<Self>
     where
-        ITER: IntoIterator<Item = I>,
-        I: Into<String>,
+        ITER: IntoIterator,
+        ITER::Item: Into<String>,
         T: Into<String>,
     {
         ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
