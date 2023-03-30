@@ -617,3 +617,20 @@ fn test_generic_constraints_try_take() {
     let body = StructBody::take(stream).unwrap();
     assert_eq!(body.fields.len(), 0);
 }
+
+#[test]
+fn test_generic_constraints_trailing_comma() {
+    use crate::parse::{
+        Attribute, AttributeLocation, DataType, GenericConstraints, Generics, StructBody,
+        Visibility,
+    };
+    use crate::token_stream;
+    let source = &mut token_stream("pub struct MyStruct<T> where T: Clone, { }");
+
+    Attribute::try_take(AttributeLocation::Container, source).unwrap();
+    Visibility::try_take(source).unwrap();
+    DataType::take(source).unwrap();
+    Generics::try_take(source).unwrap().unwrap();
+    GenericConstraints::try_take(source).unwrap().unwrap();
+    StructBody::take(source).unwrap();
+}
