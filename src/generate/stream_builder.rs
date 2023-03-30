@@ -49,13 +49,13 @@ impl StreamBuilder {
         Ok(self)
     }
 
-    /// Push a single ident to the stream. An ident is any worse that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
+    /// Push a single ident to the stream. An ident is any word that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
     pub fn ident(&mut self, ident: Ident) -> &mut Self {
         self.stream.extend([TokenTree::Ident(ident)]);
         self
     }
 
-    /// Push a single ident to the stream. An ident is any worse that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
+    /// Push a single ident to the stream. An ident is any word that a code file may contain, e.g. `fn`, `struct`, `where`, names of functions and structs, etc.
     pub fn ident_str(&mut self, ident: impl AsRef<str>) -> &mut Self {
         self.stream.extend([TokenTree::Ident(Ident::new(
             ident.as_ref(),
