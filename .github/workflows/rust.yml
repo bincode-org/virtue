@@ -104,6 +104,40 @@ fi",
         }
       ]
     },
+    "test_project": {
+      "name": "Test Project",
+      "runs-on": "ubuntu-latest",
+      "strategy": {
+        "matrix": {
+          "rust": [
+            "stable",
+            # "1.55.0" TODO: Pick latest stable version when we release 0.1
+          ]
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v2",
+          "name": "Checkout"
+        },
+        {
+          "uses": "actions-rs/toolchain@v1",
+          "with": {
+            "profile": "minimal",
+            "toolchain": "${{ matrix.rust }}",
+            "override": true
+          },
+          "name": "Install Rust ${{ matrix.rust }}"
+        },
+        {
+          "run": "cd test && cargo run",
+          "name": "Run the test project",
+          "env": {
+            "RUSTFLAGS": "-D warnings"
+          }
+        }
+      ]
+    },
     "lints": {
       "name": "Lints",
       "runs-on": "ubuntu-latest",
