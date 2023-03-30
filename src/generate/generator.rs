@@ -163,10 +163,7 @@ impl super::Parent for Generator {
 mod test {
     use proc_macro2::Span;
 
-    use crate::{
-        parse::{Generic, Lifetime, SimpleGeneric},
-        token_stream,
-    };
+    use crate::token_stream;
 
     use super::*;
 
