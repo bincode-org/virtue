@@ -51,16 +51,21 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     }
 
     /// Add a const to the trait implementation
-    ///
-    /// ```ignore
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
     /// generator.impl_for("Foo")
     ///          .generate_const("BAR", "u8")
     ///          .with_value(|b| {
     ///             b.push_parsed("5")?;
     ///             Ok(())
     ///          })?;
-    /// // generates:
-    /// impl Foo {
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// impl Foo for <struct or enum> {
     ///     const BAR: u8 = 5;
     /// }
     pub fn generate_const<'s>(
@@ -232,13 +237,33 @@ fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
     builder.punct('>');
 }
 
+/// A builder for constants.
 pub struct GenConst<'a, 'b, P: Parent> {
     parent: &'a mut ImplFor<'b, P>,
     name: String,
     ty: String,
 }
-
 impl<'a, 'b, P: Parent> GenConst<'a, 'b, P> {
+    /// Complete the constant definition. This function takes a callback that will form the value of the constant.
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator.impl_for("Foo")
+    ///          .generate_const("BAR", "u8")
+    ///          .with_value(|b| {
+    ///             b.push_parsed("5")?;
+    ///             Ok(())
+    ///          })?;
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// impl Foo for <struct or enum> {
+    ///     const BAR: u8 = 5;
+    /// }
+    /// ```
     pub fn with_value<F>(self, f: F) -> Result
     where
         F: FnOnce(&mut StreamBuilder) -> Result,
