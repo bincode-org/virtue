@@ -7,8 +7,8 @@ use std::iter::Peekable;
 /// The body of a struct
 #[derive(Debug)]
 pub struct StructBody {
-    /// The fields of this struct
-    pub fields: Fields,
+    /// The fields of this struct, `None` if this struct has no fields
+    pub fields: Option<Fields>,
 }
 
 impl StructBody {
@@ -16,17 +16,29 @@ impl StructBody {
         match input.peek() {
             Some(TokenTree::Group(_)) => {}
             Some(TokenTree::Punct(p)) if p.as_char() == ';' => {
-                return Ok(StructBody {
-                    fields: Fields::Unit,
-                })
+                return Ok(StructBody { fields: None })
             }
             token => return Error::wrong_token(token, "group or punct"),
         }
         let group = assume_group(input.next());
         let mut stream = group.stream().into_iter().peekable();
         let fields = match group.delimiter() {
-            Delimiter::Brace => Fields::Struct(UnnamedField::parse_with_name(&mut stream)?),
-            Delimiter::Parenthesis => Fields::Tuple(UnnamedField::parse(&mut stream)?),
+            Delimiter::Brace => {
+                let fields = UnnamedField::parse_with_name(&mut stream)?;
+                if fields.is_empty() {
+                    None
+                } else {
+                    Some(Fields::Struct(fields))
+                }
+            }
+            Delimiter::Parenthesis => {
+                let fields = UnnamedField::parse(&mut stream)?;
+                if fields.is_empty() {
+                    None
+                } else {
+                    Some(Fields::Tuple(fields))
+                }
+            }
             found => {
                 return Err(Error::InvalidRustSyntax {
                     span: group.span(),
@@ -49,19 +61,20 @@ fn test_struct_body_take() {
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
+    let fields = body.fields.as_ref().unwrap();
 
-    assert_eq!(body.fields.len(), 3);
-    let (ident, field) = body.fields.get(0).unwrap();
+    assert_eq!(fields.len(), 3);
+    let (ident, field) = fields.get(0).unwrap();
     assert_eq!(ident.unwrap(), "bar");
     assert_eq!(field.vis, Visibility::Pub);
     assert_eq!(field.type_string(), "u8");
 
-    let (ident, field) = body.fields.get(1).unwrap();
+    let (ident, field) = fields.get(1).unwrap();
     assert_eq!(ident.unwrap(), "baz");
     assert_eq!(field.vis, Visibility::Pub);
     assert_eq!(field.type_string(), "u32");
 
-    let (ident, field) = body.fields.get(2).unwrap();
+    let (ident, field) = fields.get(2).unwrap();
     assert_eq!(ident.unwrap(), "bla");
     assert_eq!(field.vis, Visibility::Default);
     assert_eq!(field.type_string(), "Vec<Box<dynFuture<Output=()>>>");
@@ -73,20 +86,21 @@ fn test_struct_body_take() {
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
+    let fields = body.fields.as_ref().unwrap();
 
-    assert_eq!(body.fields.len(), 3);
+    assert_eq!(fields.len(), 3);
 
-    let (ident, field) = body.fields.get(0).unwrap();
+    let (ident, field) = fields.get(0).unwrap();
     assert!(ident.is_none());
     assert_eq!(field.vis, Visibility::Pub);
     assert_eq!(field.type_string(), "u8");
 
-    let (ident, field) = body.fields.get(1).unwrap();
+    let (ident, field) = fields.get(1).unwrap();
     assert!(ident.is_none());
     assert_eq!(field.vis, Visibility::Pub);
     assert_eq!(field.type_string(), "u32");
 
-    let (ident, field) = body.fields.get(2).unwrap();
+    let (ident, field) = fields.get(2).unwrap();
     assert!(ident.is_none());
     assert_eq!(field.vis, Visibility::Default);
     assert_eq!(field.type_string(), "Vec<Box<dynFuture<Output=()>>>");
@@ -96,20 +110,21 @@ fn test_struct_body_take() {
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
-    assert_eq!(body.fields.len(), 0);
+    assert!(body.fields.is_none());
 
     let stream = &mut token_stream("struct Foo {}");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
-    assert_eq!(body.fields.len(), 0);
+    assert!(body.fields.is_none());
 
     let stream = &mut token_stream("struct Foo ()");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
     assert_eq!(data_type, super::DataType::Struct);
     assert_eq!(ident, "Foo");
-    assert_eq!(body.fields.len(), 0);
+    let body = StructBody::take(stream).unwrap();
+    assert!(body.fields.is_none());
 }
 
 /// The body of an enum
@@ -140,37 +155,38 @@ impl EnumBody {
                 None => Error::wrong_token(stream.peek(), "ident")?,
             };
 
-            let mut fields = Fields::Unit;
+            let mut fields = None;
+            let mut value = None;
 
-            match stream.peek() {
-                Some(TokenTree::Group(_)) => {
-                    let group = assume_group(stream.next());
-                    let stream = &mut group.stream().into_iter().peekable();
-                    match group.delimiter() {
-                        Delimiter::Brace => {
-                            fields = Fields::Struct(UnnamedField::parse_with_name(stream)?)
-                        }
-                        Delimiter::Parenthesis => {
-                            fields = Fields::Tuple(UnnamedField::parse(stream)?)
-                        }
-                        delim => {
-                            return Err(Error::InvalidRustSyntax {
-                                span: group.span(),
-                                expected: format!("Brace or parenthesis, found {:?}", delim),
-                            })
-                        }
+            if let Some(TokenTree::Group(_)) = stream.peek() {
+                let group = assume_group(stream.next());
+                let stream = &mut group.stream().into_iter().peekable();
+                match group.delimiter() {
+                    Delimiter::Brace => {
+                        fields = Some(Fields::Struct(UnnamedField::parse_with_name(stream)?));
+                    }
+                    Delimiter::Parenthesis => {
+                        fields = Some(Fields::Tuple(UnnamedField::parse(stream)?));
+                    }
+                    delim => {
+                        return Err(Error::InvalidRustSyntax {
+                            span: group.span(),
+                            expected: format!("Brace or parenthesis, found {:?}", delim),
+                        })
                     }
                 }
+            }
+            match stream.peek() {
                 Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
                     assume_punct(stream.next(), '=');
                     match stream.next() {
                         Some(TokenTree::Literal(lit)) => {
-                            fields = Fields::Integer(lit);
+                            value = Some(lit);
                         }
                         Some(TokenTree::Punct(p)) if p.as_char() == '-' => match stream.next() {
                             Some(TokenTree::Literal(lit)) => {
-                                fields = match lit.to_string().parse::<i64>() {
-                                    Ok(val) => Fields::Integer(Literal::i64_unsuffixed(-val)),
+                                match lit.to_string().parse::<i64>() {
+                                    Ok(val) => value = Some(Literal::i64_unsuffixed(-val)),
                                     Err(_) => {
                                         return Err(Error::custom_at(
                                             "parse::<i64> failed",
@@ -198,6 +214,7 @@ impl EnumBody {
             variants.push(EnumVariant {
                 name: ident,
                 fields,
+                value,
                 attributes,
             });
         }
@@ -215,7 +232,7 @@ fn test_enum_body_take() {
     assert_eq!(data_type, super::DataType::Enum);
     assert_eq!(ident, "Foo");
     let body = EnumBody::take(stream).unwrap();
-    assert_eq!(0, body.variants.len());
+    assert!(body.variants.is_empty());
 
     let stream = &mut token_stream("enum Foo { Bar, Baz(u8), Blah { a: u32, b: u128 } }");
     let (data_type, ident) = super::DataType::take(stream).unwrap();
@@ -225,20 +242,24 @@ fn test_enum_body_take() {
     assert_eq!(3, body.variants.len());
 
     assert_eq!(body.variants[0].name, "Bar");
-    assert!(body.variants[0].fields.is_unit());
+    assert!(body.variants[0].fields.is_none());
 
     assert_eq!(body.variants[1].name, "Baz");
-    assert_eq!(1, body.variants[1].fields.len());
-    let (ident, field) = body.variants[1].fields.get(0).unwrap();
+    assert!(body.variants[1].fields.is_some());
+    let fields = body.variants[1].fields.as_ref().unwrap();
+    assert_eq!(1, fields.len());
+    let (ident, field) = fields.get(0).unwrap();
     assert!(ident.is_none());
     assert_eq!(field.type_string(), "u8");
 
     assert_eq!(body.variants[2].name, "Blah");
-    assert_eq!(2, body.variants[2].fields.len());
-    let (ident, field) = body.variants[2].fields.get(0).unwrap();
+    assert!(body.variants[2].fields.is_some());
+    let fields = body.variants[2].fields.as_ref().unwrap();
+    assert_eq!(2, fields.len());
+    let (ident, field) = fields.get(0).unwrap();
     assert_eq!(ident.unwrap(), "a");
     assert_eq!(field.type_string(), "u32");
-    let (ident, field) = body.variants[2].fields.get(1).unwrap();
+    let (ident, field) = fields.get(1).unwrap();
     assert_eq!(ident.unwrap(), "b");
     assert_eq!(field.type_string(), "u128");
 
@@ -250,10 +271,31 @@ fn test_enum_body_take() {
     assert_eq!(2, body.variants.len());
 
     assert_eq!(body.variants[0].name, "Bar");
-    assert_eq!(body.variants[0].fields.get_integer(), Some(-1));
+    assert!(body.variants[0].fields.is_none());
+    assert_eq!(body.variants[0].get_integer(), -1);
 
     assert_eq!(body.variants[1].name, "Baz");
-    assert_eq!(body.variants[1].fields.get_integer(), Some(2));
+    assert!(body.variants[1].fields.is_none());
+    assert_eq!(body.variants[1].get_integer(), 2);
+
+    let stream = &mut token_stream("enum Foo { Bar(i32) = -1, Baz { a: i32 } = 2 }");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Enum);
+    assert_eq!(ident, "Foo");
+    let body = EnumBody::take(stream).unwrap();
+    assert_eq!(2, body.variants.len());
+
+    assert_eq!(body.variants[0].name, "Bar");
+    assert!(body.variants[0].fields.is_some());
+    let fields = body.variants[0].fields.as_ref().unwrap();
+    assert_eq!(fields.len(), 1);
+    assert_eq!(body.variants[0].get_integer(), -1);
+
+    assert_eq!(body.variants[1].name, "Baz");
+    assert!(body.variants[1].fields.is_some());
+    let fields = body.variants[1].fields.as_ref().unwrap();
+    assert_eq!(fields.len(), 1);
+    assert_eq!(body.variants[1].get_integer(), 2);
 }
 
 /// A variant of an enum
@@ -262,44 +304,31 @@ pub struct EnumVariant {
     /// The name of the variant
     pub name: Ident,
     /// The field of the variant. See [`Fields`] for more info
-    pub fields: Fields,
+    pub fields: Option<Fields>,
+    /// The value of this variant. This can be one of:
+    /// - `Baz = 5`
+    /// - `Baz(i32) = 5`
+    /// - `Baz { a: i32} = 5`
+    /// In either case this value will be `Some(Literal::i32(5))`
+    pub value: Option<Literal>,
     /// The attributes of this variant
     pub attributes: Vec<Attribute>,
 }
 
+#[cfg(test)]
 impl EnumVariant {
-    /// Returns `true` if the variant has a fixed value.
-    ///
-    /// ```
-    /// enum Foo {
-    ///     Bar = 0, // .has_fixed_value(): true
-    ///     Baz, // .has_fixed_value(): false
-    /// }
-    pub fn has_fixed_value(&self) -> bool {
-        matches!(&self.fields, Fields::Integer(_))
+    fn get_integer(&self) -> i64 {
+        let value = self.value.as_ref().expect("Variant has no value");
+        value
+            .to_string()
+            .parse()
+            .expect("Value is not a valid integer")
     }
 }
 
-/// The different field types an enum variant can have
+/// The different field types an enum variant can have.
 #[derive(Debug)]
 pub enum Fields {
-    /// Empty variant.
-    /// ```rs
-    /// enum Foo {
-    ///     Baz,
-    /// }
-    /// struct Bar { }
-    /// ```
-    Unit,
-
-    /// Variant with an integer value.
-    /// ```rs
-    /// enum Foo {
-    ///     Baz = 5,
-    /// }
-    /// ```
-    Integer(Literal),
-
     /// Tuple-like variant
     /// ```rs
     /// enum Foo {
@@ -328,12 +357,11 @@ impl Fields {
     ///
     /// ```
     /// enum Foo {
-    ///     A, // will return an empty vec
     ///     C(u32, u32), // will return `vec[Index { index: 0 }, Index { index: 1 }]`
     ///     D { a: u32, b: u32 }, // will return `vec[Ident { ident: "a" }, Ident { ident: "b" }]`
     /// }
     pub fn names(&self) -> Vec<IdentOrIndex> {
-        match self {
+        let result: Vec<IdentOrIndex> = match self {
             Self::Tuple(fields) => fields
                 .iter()
                 .enumerate()
@@ -350,60 +378,42 @@ impl Fields {
                     attributes: &field.attributes,
                 })
                 .collect(),
-            Self::Unit | Self::Integer(_) => Vec::new(),
+        };
+        if cfg!(test) {
+            assert!(!result.is_empty());
         }
+        result
     }
 
     /// Return the delimiter of the group for this variant
     ///
     /// ```
     /// enum Foo {
-    ///     A, // will return `None`
-    ///     C(u32, u32), // will return `Some(Delimiter::Paranthesis)`
-    ///     D { a: u32, b: u32 }, // will return `Some(Delimiter::Brace)`
+    ///     C(u32, u32), // will return `Delimiter::Paranthesis`
+    ///     D { a: u32, b: u32 }, // will return `Delimiter::Brace`
     /// }
     /// ```
-    pub fn delimiter(&self) -> Option<Delimiter> {
+    pub fn delimiter(&self) -> Delimiter {
         match self {
-            Self::Tuple(_) => Some(Delimiter::Parenthesis),
-            Self::Struct(_) => Some(Delimiter::Brace),
-            Self::Unit | Self::Integer(_) => None,
+            Self::Tuple(_) => Delimiter::Parenthesis,
+            Self::Struct(_) => Delimiter::Brace,
         }
     }
 }
 
 #[cfg(test)]
 impl Fields {
-    pub fn is_unit(&self) -> bool {
-        matches!(self, Self::Unit)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             Self::Tuple(fields) => fields.len(),
             Self::Struct(fields) => fields.len(),
-            Self::Unit => 0,
-            Self::Integer(_) => 0,
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<(Option<&Ident>, &UnnamedField)> {
+    fn get(&self, index: usize) -> Option<(Option<&Ident>, &UnnamedField)> {
         match self {
             Self::Tuple(fields) => fields.get(index).map(|f| (None, f)),
             Self::Struct(fields) => fields.get(index).map(|(ident, field)| (Some(ident), field)),
-            Self::Unit => None,
-            Self::Integer(_) => None,
-        }
-    }
-
-    pub fn get_integer(&self) -> Option<i64> {
-        match self {
-            Self::Integer(i) => Some(i.to_string().parse().unwrap()),
-            _ => None,
         }
     }
 }
@@ -584,4 +594,12 @@ impl std::fmt::Display for IdentOrIndex<'_> {
             IdentOrIndex::Index { index, .. } => write!(fmt, "{}", index),
         }
     }
+}
+
+#[test]
+fn enum_explicit_variants() {
+    use crate::token_stream;
+    let stream = &mut token_stream("{ A = 1, B = 2 }");
+    let body = EnumBody::take(stream).unwrap();
+    assert_eq!(body.variants.len(), 2);
 }
