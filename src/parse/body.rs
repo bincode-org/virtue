@@ -380,7 +380,7 @@ impl Fields {
                 .collect(),
         };
         if cfg!(test) {
-            assert!(result.len() > 0);
+            assert!(!result.is_empty());
         }
         result
     }
