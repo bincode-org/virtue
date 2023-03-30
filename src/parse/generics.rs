@@ -615,7 +615,7 @@ fn test_generic_constraints_try_take() {
     assert_eq!(constraints.len(), 1);
     assert_eq!(constraints[0].ident(), "T");
     let body = StructBody::take(stream).unwrap();
-    assert_eq!(body.fields.len(), 0);
+    assert!(body.fields.is_none());
 }
 
 #[test]
