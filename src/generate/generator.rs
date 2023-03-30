@@ -158,3 +158,51 @@ impl super::Parent for Generator {
         self.generic_constraints.as_ref()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use proc_macro2::Span;
+
+    use crate::{token_stream, parse::{Generic, SimpleGeneric, Lifetime}};
+
+    use super::*;
+
+    #[test]
+    fn impl_for_with_lifetimes() {
+        // No generics
+        let mut generator = Generator::new(
+            Ident::new("StructOrEnum", Span::call_site()),
+            None,
+            None);
+        let _ = generator.impl_for_with_lifetimes("Foo", ["a", "b"]);
+        let output = generator.finish().unwrap();
+        assert_eq!(
+            output.into_iter().map(|v| v.to_string()).collect::<String>(),
+            token_stream("impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }").map(|v| v.to_string()).collect::<String>(),
+        );
+
+        //with simple generics
+        let mut generator = Generator::new(
+           Ident::new("StructOrEnum", Span::call_site()),
+           Generics::try_take(&mut token_stream("<T1, T2>")).unwrap(),
+           None);
+        let _ = generator.impl_for_with_lifetimes("Foo", ["a", "b"]);
+        let output = generator.finish().unwrap();
+        assert_eq!(
+           output.into_iter().map(|v| v.to_string()).collect::<String>(),
+           token_stream("impl<'a, 'b, T1, T2> Foo<'a, 'b> for StructOrEnum<T1, T2> { }").map(|v| v.to_string()).collect::<String>()
+        );
+
+        // with lifetimes
+        let mut generator = Generator::new(
+            Ident::new("StructOrEnum", Span::call_site()),
+            Generics::try_take(&mut token_stream("<'alpha, 'beta>")).unwrap(),
+            None);
+        let _ = generator.impl_for_with_lifetimes("Foo", ["a", "b"]);
+        let output = generator.finish().unwrap();
+        assert_eq!(
+            output.into_iter().map(|v| v.to_string()).collect::<String>(),
+            token_stream("impl<'a, 'b, 'alpha, 'beta> Foo<'a, 'b> for StructOrEnum<'alpha, 'beta> { }").map(|v| v.to_string()).collect::<String>()
+        );
+    }
+}

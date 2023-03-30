@@ -122,18 +122,11 @@ impl Generics {
         for (idx, lt) in lifetime.iter().enumerate() {
             result.punct(if idx == 0 { '<' } else { ',' });
             result.lifetime_str(lt);
+        }
 
-            if self.has_lifetime() {
-                for (idx, lt) in self.iter().filter_map(|lt| lt.as_lifetime()).enumerate() {
-                    result.punct(if idx == 0 { ':' } else { '+' });
-                    result.lifetime(lt.ident.clone());
-                }
-            }
-
-            for generic in self.iter() {
-                result.punct(',');
-                generic.append_to_result_with_constraints(&mut result);
-            }
+        for generic in self.iter() {
+            result.punct(',');
+            generic.append_to_result_with_constraints(&mut result);
         }
 
         result.punct('>');
@@ -218,13 +211,6 @@ impl Generic {
             Self::Lifetime(lt) => lt.ident.clone(),
             Self::Generic(gen) => gen.ident.clone(),
             Self::Const(gen) => gen.ident.clone(),
-        }
-    }
-
-    fn as_lifetime(&self) -> Option<&Lifetime> {
-        match self {
-            Self::Lifetime(lt) => Some(lt),
-            _ => None,
         }
     }
 
