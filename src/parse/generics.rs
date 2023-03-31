@@ -143,9 +143,9 @@ impl Generics {
                 result.punct(',');
             }
             if generic.is_lifetime() {
-                result.lifetime(generic.ident());
+                result.lifetime(generic.ident().clone());
             } else {
-                result.ident(generic.ident());
+                result.ident(generic.ident().clone());
             }
         }
 
@@ -206,11 +206,12 @@ impl Generic {
         matches!(self, Generic::Lifetime(_))
     }
 
-    fn ident(&self) -> Ident {
+    /// The ident of this generic
+    pub fn ident(&self) -> &Ident {
         match self {
-            Self::Lifetime(lt) => lt.ident.clone(),
-            Self::Generic(gen) => gen.ident.clone(),
-            Self::Const(gen) => gen.ident.clone(),
+            Self::Lifetime(lt) => &lt.ident,
+            Self::Generic(gen) => &gen.ident,
+            Self::Const(gen) => &gen.ident,
         }
     }
 
@@ -457,9 +458,12 @@ impl SimpleGeneric {
 /// a const generic parameter, e.g. `struct Foo<const N: usize> { .. }`
 #[derive(Debug, Clone)]
 pub struct ConstGeneric {
-    const_token: Ident,
-    ident: Ident,
-    constraints: Vec<TokenTree>,
+    /// The `const` token for this generic
+    pub const_token: Ident,
+    /// The ident of this generic
+    pub ident: Ident,
+    /// The "constraints" (type) of this generic, e.g. `const N: usize`
+    pub constraints: Vec<TokenTree>,
 }
 
 impl ConstGeneric {
