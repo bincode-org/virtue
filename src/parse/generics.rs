@@ -462,7 +462,7 @@ pub struct ConstGeneric {
     pub const_token: Ident,
     /// The ident of this generic
     pub ident: Ident,
-    /// The "constraints" (type) of this generic, e.g. `const N: usize`
+    /// The "constraints" (type) of this generic, e.g. the `usize` from `const N: usize`
     pub constraints: Vec<TokenTree>,
 }
 
