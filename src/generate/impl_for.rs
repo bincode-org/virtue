@@ -149,9 +149,9 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     {
         if let Some(generics) = self.generator.generics() {
             let mut constraints = self
-                .generator
-                .generic_constraints()
-                .cloned()
+                .custom_generic_constraints
+                .take()
+                .or_else(|| self.generator.generic_constraints().cloned())
                 .unwrap_or_default();
             cb(generics, &mut constraints)?;
             self.custom_generic_constraints = Some(constraints)
