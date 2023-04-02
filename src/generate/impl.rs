@@ -82,13 +82,13 @@ impl<'a> Impl<'a, Generator> {
         CB: FnOnce(&Generics, &mut GenericConstraints),
     {
         if let Some(generics) = self.parent.generics() {
-            let mut constraints = self
-                .custom_generic_constraints
-                .take()
-                .or_else(|| self.parent.generic_constraints().cloned())
-                .unwrap_or_default();
-            cb(generics, &mut constraints);
-            self.custom_generic_constraints = Some(constraints)
+            let constraints = self.custom_generic_constraints.get_or_insert_with(|| {
+                self.parent
+                    .generic_constraints()
+                    .cloned()
+                    .unwrap_or_default()
+            });
+            cb(generics, constraints);
         }
         self
     }
