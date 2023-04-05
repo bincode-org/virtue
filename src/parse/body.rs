@@ -289,13 +289,40 @@ fn test_enum_body_take() {
     assert!(body.variants[0].fields.is_some());
     let fields = body.variants[0].fields.as_ref().unwrap();
     assert_eq!(fields.len(), 1);
+    assert!(matches!(fields.names()[0], IdentOrIndex::Index { index, .. } if index == 0));
     assert_eq!(body.variants[0].get_integer(), -1);
 
     assert_eq!(body.variants[1].name, "Baz");
     assert!(body.variants[1].fields.is_some());
     let fields = body.variants[1].fields.as_ref().unwrap();
     assert_eq!(fields.len(), 1);
+    assert_eq!(fields.names().len(), 1);
+    assert!(
+        matches!(fields.names()[0], IdentOrIndex::Ident { ident, .. } if ident.to_string() == "a")
+    );
     assert_eq!(body.variants[1].get_integer(), 2);
+
+    let stream = &mut token_stream("enum Foo { Round(), Curly{}, Without }");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Enum);
+    assert_eq!(ident, "Foo");
+    let body = EnumBody::take(stream).unwrap();
+    assert_eq!(3, body.variants.len());
+
+    assert_eq!(body.variants[0].name, "Round");
+    assert!(body.variants[0].fields.is_some());
+    let fields = body.variants[0].fields.as_ref().unwrap();
+    assert!(fields.names().is_empty());
+    assert_eq!(fields.len(), 0);
+
+    assert_eq!(body.variants[1].name, "Curly");
+    assert!(body.variants[1].fields.is_some());
+    let fields = body.variants[1].fields.as_ref().unwrap();
+    assert!(fields.names().is_empty());
+    assert_eq!(fields.len(), 0);
+
+    assert_eq!(body.variants[2].name, "Without");
+    assert!(body.variants[2].fields.is_none());
 }
 
 /// A variant of an enum
