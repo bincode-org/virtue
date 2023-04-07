@@ -589,6 +589,7 @@ impl GenericConstraints {
 #[test]
 fn test_generic_constraints_try_take() {
     use super::{DataType, StructBody, Visibility};
+    use crate::parse::body::Fields;
     use crate::token_stream;
 
     let stream = &mut token_stream("struct Foo where Foo: Bar { }");
@@ -625,7 +626,11 @@ fn test_generic_constraints_try_take() {
     assert_eq!(constraints.len(), 1);
     assert_eq!(constraints[0].ident(), "T");
     let body = StructBody::take(stream).unwrap();
-    assert!(body.fields.is_none());
+    if let Some(Fields::Struct(v)) = body.fields {
+        assert!(v.len() == 0);
+    } else {
+        panic!("wrong fields {:?}", body.fields);
+    }
 }
 
 #[test]
