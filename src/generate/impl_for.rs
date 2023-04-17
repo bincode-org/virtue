@@ -60,9 +60,8 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
         let mut builder = StreamBuilder::new();
         builder.punct('#').group(Delimiter::Brace, |builder| {
-            Ok({
-                builder.push_parsed(attr)?;
-            })
+            builder.push_parsed(attr)?;
+            Ok(())
         })?;
         self.outer_attr.push(builder);
         Ok(())
@@ -75,9 +74,8 @@ impl<'a, P: Parent> ImplFor<'a, P> {
             .punct('#')
             .punct('!')
             .group(Delimiter::Brace, |builder| {
-                Ok({
-                    builder.push_parsed(attr)?;
-                })
+                builder.push_parsed(attr)?;
+                Ok(())
             })?;
         self.inner_attr.push(builder);
         Ok(())
@@ -101,11 +99,7 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     /// impl Foo for <struct or enum> {
     ///     const BAR: u8 = 5;
     /// }
-    pub fn generate_const<'s>(
-        &'s mut self,
-        name: impl Into<String>,
-        ty: impl Into<String>,
-    ) -> GenConst<'s> {
+    pub fn generate_const(&mut self, name: impl Into<String>, ty: impl Into<String>) -> GenConst {
         GenConst::new(&mut self.consts, name, ty)
     }
 
