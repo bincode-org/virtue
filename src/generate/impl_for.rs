@@ -1,4 +1,4 @@
-use super::{generate_fn::FnParent, FnBuilder, Parent, StreamBuilder};
+use super::{generate_item::FnParent, FnBuilder, GenConst, Parent, StreamBuilder};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -8,6 +8,8 @@ use crate::{
 /// A helper struct for implementing a trait for a given struct or enum.
 pub struct ImplFor<'a, P: Parent> {
     generator: &'a mut P,
+    outer_attr: Vec<StreamBuilder>,
+    inner_attr: Vec<StreamBuilder>,
     trait_name: String,
     lifetimes: Option<Vec<String>>,
     consts: Vec<StreamBuilder>,
@@ -20,6 +22,8 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     pub(super) fn new(generator: &'a mut P, trait_name: impl Into<String>) -> Self {
         Self {
             generator,
+            outer_attr: Vec::new(),
+            inner_attr: Vec::new(),
             trait_name: trait_name.into(),
             lifetimes: None,
             consts: Vec::new(),
@@ -41,6 +45,8 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     {
         Self {
             generator,
+            outer_attr: Vec::new(),
+            inner_attr: Vec::new(),
             trait_name: trait_name.into(),
             lifetimes: Some(lifetimes.into_iter().map(Into::into).collect()),
             consts: Vec::new(),
@@ -48,6 +54,33 @@ impl<'a, P: Parent> ImplFor<'a, P> {
             impl_types: Vec::new(),
             fns: Vec::new(),
         }
+    }
+
+    /// Add a outer attribute to the trait implementation
+    pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder.punct('#').group(Delimiter::Brace, |builder| {
+            Ok({
+                builder.push_parsed(attr)?;
+            })
+        })?;
+        self.outer_attr.push(builder);
+        Ok(())
+    }
+
+    /// Add a inner attribute to the trait implementation
+    pub fn impl_inner_attr(&mut self, attr: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder
+            .punct('#')
+            .punct('!')
+            .group(Delimiter::Brace, |builder| {
+                Ok({
+                    builder.push_parsed(attr)?;
+                })
+            })?;
+        self.inner_attr.push(builder);
+        Ok(())
     }
 
     /// Add a const to the trait implementation
@@ -72,12 +105,8 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         &'s mut self,
         name: impl Into<String>,
         ty: impl Into<String>,
-    ) -> GenConst<'s, 'a, P> {
-        GenConst {
-            parent: self,
-            name: name.into(),
-            ty: ty.into(),
-        }
+    ) -> GenConst<'s> {
+        GenConst::new(&mut self.consts, name, ty)
     }
 
     /// Add a function to the trait implementation.
@@ -173,10 +202,17 @@ impl<P: Parent> Drop for ImplFor<'_, P> {
             return;
         }
         let mut builder = StreamBuilder::new();
-        self.generate_fn_definition(&mut builder);
+        for attr in std::mem::take(&mut self.outer_attr) {
+            builder.append(attr);
+        }
+
+        self.generate_impl_definition(&mut builder);
 
         builder
             .group(Delimiter::Brace, |builder| {
+                for attr in std::mem::take(&mut self.inner_attr) {
+                    builder.append(attr);
+                }
                 for ty in std::mem::take(&mut self.impl_types) {
                     builder.append(ty);
                 }
@@ -201,7 +237,7 @@ impl<P: Parent> Drop for ImplFor<'_, P> {
 }
 
 impl<P: Parent> ImplFor<'_, P> {
-    fn generate_fn_definition(&mut self, builder: &mut StreamBuilder) {
+    fn generate_impl_definition(&mut self, builder: &mut StreamBuilder) {
         builder.ident_str("impl");
         if let Some(lifetimes) = &self.lifetimes {
             if let Some(generics) = self.generator.generics() {
@@ -235,49 +271,4 @@ fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
         builder.lifetime_str(lt);
     }
     builder.punct('>');
-}
-
-/// A builder for constants.
-pub struct GenConst<'a, 'b, P: Parent> {
-    parent: &'a mut ImplFor<'b, P>,
-    name: String,
-    ty: String,
-}
-impl<'a, 'b, P: Parent> GenConst<'a, 'b, P> {
-    /// Complete the constant definition. This function takes a callback that will form the value of the constant.
-    ///
-    /// ```no_run
-    /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
-    /// generator.impl_for("Foo")
-    ///          .generate_const("BAR", "u8")
-    ///          .with_value(|b| {
-    ///             b.push_parsed("5")?;
-    ///             Ok(())
-    ///          })?;
-    /// # Ok::<_, virtue::Error>(())
-    /// ```
-    ///
-    /// Generates:
-    /// ```ignore
-    /// impl Foo for <struct or enum> {
-    ///     const BAR: u8 = 5;
-    /// }
-    /// ```
-    pub fn with_value<F>(self, f: F) -> Result
-    where
-        F: FnOnce(&mut StreamBuilder) -> Result,
-    {
-        let mut builder = StreamBuilder::new();
-        builder
-            .ident_str("const")
-            .push_parsed(self.name)?
-            .punct(':')
-            .push_parsed(self.ty)?
-            .punct('=');
-        f(&mut builder)?;
-        builder.punct(';');
-        self.parent.consts.push(builder);
-        Ok(())
-    }
 }

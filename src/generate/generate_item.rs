@@ -4,11 +4,92 @@ use crate::{
     prelude::{Delimiter, Result},
 };
 
+/// A builder for constants.
+pub struct GenConst<'a> {
+    consts: &'a mut Vec<StreamBuilder>,
+    attrs: Vec<String>,
+    name: String,
+    ty: String,
+}
+
+impl<'a> GenConst<'a> {
+    pub(crate) fn new(
+        consts: &'a mut Vec<StreamBuilder>,
+        name: impl Into<String>,
+        ty: impl Into<String>,
+    ) -> Self {
+        Self {
+            consts,
+            attrs: Vec::new(),
+            name: name.into(),
+            ty: ty.into(),
+        }
+    }
+
+    /// Add an outer attribute
+    #[must_use]
+    pub fn with_attr(mut self, attr: impl Into<String>) -> Self {
+        self.attrs.push(attr.into());
+        self
+    }
+
+    /// Complete the constant definition. This function takes a callback that will form the value of the constant.
+    ///
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator.impl_for("Foo")
+    ///          .generate_const("BAR", "u8")
+    ///          .with_value(|b| {
+    ///             b.push_parsed("5")?;
+    ///             Ok(())
+    ///          })?;
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// impl Foo for <struct or enum> {
+    ///     const BAR: u8 = 5;
+    /// }
+    /// ```
+    pub fn with_value<F>(self, f: F) -> Result
+    where
+        F: FnOnce(&mut StreamBuilder) -> Result,
+    {
+        let mut builder = StreamBuilder::new();
+
+        for attr in self.attrs {
+            builder
+                .punct('#')
+                .punct('!')
+                .group(Delimiter::Brace, |builder| {
+                    Ok({
+                        builder.push_parsed(attr)?;
+                    })
+                })?;
+        }
+
+        builder
+            .ident_str("const")
+            .push_parsed(self.name)?
+            .punct(':')
+            .push_parsed(self.ty)?
+            .punct('=');
+        f(&mut builder)?;
+        builder.punct(';');
+
+        self.consts.push(builder);
+        Ok(())
+    }
+}
+
 /// A builder for functions.
 pub struct FnBuilder<'a, P> {
     parent: &'a mut P,
     name: String,
 
+    attrs: Vec<String>,
     is_async: bool,
     lifetimes: Vec<(String, Vec<String>)>,
     generics: Vec<(String, Vec<String>)>,
@@ -23,6 +104,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         Self {
             parent,
             name: name.into(),
+            attrs: Vec::new(),
             is_async: false,
             lifetimes: Vec::new(),
             generics: Vec::new(),
@@ -31,6 +113,13 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
             return_type: None,
             vis: Visibility::Default,
         }
+    }
+
+    /// Add an outer attribute
+    #[must_use]
+    pub fn with_attr(mut self, attr: impl Into<String>) -> Self {
+        self.attrs.push(attr.into());
+        self
     }
 
     /// Add a lifetime parameter.
@@ -217,6 +306,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         let FnBuilder {
             parent,
             name,
+            attrs,
             is_async,
             lifetimes,
             generics,
@@ -227,6 +317,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
         } = self;
 
         let mut builder = StreamBuilder::new();
+
+        // attrs
+        for attr in attrs {
+            builder.punct('#').group(Delimiter::Brace, |builder| {
+                Ok({
+                    builder.push_parsed(attr)?;
+                })
+            })?;
+        }
 
         // function name; `fn name`
         if vis == Visibility::Pub {
