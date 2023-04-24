@@ -1,4 +1,7 @@
-use super::{generate_fn::FnParent, FnBuilder, Generator, Parent, StreamBuilder};
+use super::{
+    gen_const::ConstParent, generate_fn::FnParent, FnBuilder, GenConst, Generator, Parent,
+    StreamBuilder,
+};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -10,6 +13,7 @@ pub struct Impl<'a, P: Parent> {
     parent: &'a mut P,
     name: String,
     // pub(super) group: StreamBuilder,
+    consts: Vec<StreamBuilder>,
     custom_generic_constraints: Option<GenericConstraints>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
@@ -19,6 +23,7 @@ impl<'a, P: Parent> Impl<'a, P> {
         Self {
             name: parent.name().to_string(),
             parent,
+            consts: Vec::new(),
             custom_generic_constraints: None,
             fns: Vec::new(),
         }
@@ -28,12 +33,24 @@ impl<'a, P: Parent> Impl<'a, P> {
         Self {
             parent,
             name: name.into(),
+            consts: Vec::new(),
             custom_generic_constraints: None,
             fns: Vec::new(),
         }
     }
 
-    /// Add a function to the trait implementation.
+    /// Add a const to the implementation
+    ///
+    /// See ImplFor for more information.
+    pub fn generate_const(
+        &mut self,
+        name: impl Into<String>,
+        ty: impl Into<String>,
+    ) -> GenConst<Self> {
+        GenConst::new(self, name, ty)
+    }
+
+    /// Add a function to the implementation.
     ///
     /// `generator.impl().generate_fn("bar")` results in code like:
     ///
@@ -94,6 +111,13 @@ impl<'a> Impl<'a, Generator> {
     }
 }
 
+impl<'a, P: Parent> ConstParent for Impl<'a, P> {
+    fn append(&mut self, builder: StreamBuilder) -> Result {
+        self.consts.push(builder);
+        Ok(())
+    }
+}
+
 impl<'a, P: Parent> FnParent for Impl<'a, P> {
     fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
         self.fns.push((fn_definition, fn_body));
@@ -125,6 +149,9 @@ impl<'a, P: Parent> Drop for Impl<'a, P> {
 
         builder
             .group(Delimiter::Brace, |builder| {
+                for r#const in std::mem::take(&mut self.consts) {
+                    builder.append(r#const);
+                }
                 for (fn_def, fn_body) in std::mem::take(&mut self.fns) {
                     builder.append(fn_def);
                     builder

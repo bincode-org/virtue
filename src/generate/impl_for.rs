@@ -1,4 +1,6 @@
-use super::{generate_fn::FnParent, FnBuilder, Parent, StreamBuilder};
+use super::{
+    gen_const::ConstParent, generate_fn::FnParent, FnBuilder, GenConst, Parent, StreamBuilder,
+};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -68,16 +70,12 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     /// impl Foo for <struct or enum> {
     ///     const BAR: u8 = 5;
     /// }
-    pub fn generate_const<'s>(
-        &'s mut self,
+    pub fn generate_const(
+        &mut self,
         name: impl Into<String>,
         ty: impl Into<String>,
-    ) -> GenConst<'s, 'a, P> {
-        GenConst {
-            parent: self,
-            name: name.into(),
-            ty: ty.into(),
-        }
+    ) -> GenConst<Self> {
+        GenConst::new(self, name, ty)
     }
 
     /// Add a function to the trait implementation.
@@ -160,6 +158,13 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     }
 }
 
+impl<'a, P: Parent> ConstParent for ImplFor<'a, P> {
+    fn append(&mut self, builder: StreamBuilder) -> Result {
+        self.consts.push(builder);
+        Ok(())
+    }
+}
+
 impl<'a, P: Parent> FnParent for ImplFor<'a, P> {
     fn append(&mut self, fn_definition: StreamBuilder, fn_body: StreamBuilder) -> Result {
         self.fns.push((fn_definition, fn_body));
@@ -235,49 +240,4 @@ fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
         builder.lifetime_str(lt);
     }
     builder.punct('>');
-}
-
-/// A builder for constants.
-pub struct GenConst<'a, 'b, P: Parent> {
-    parent: &'a mut ImplFor<'b, P>,
-    name: String,
-    ty: String,
-}
-impl<'a, 'b, P: Parent> GenConst<'a, 'b, P> {
-    /// Complete the constant definition. This function takes a callback that will form the value of the constant.
-    ///
-    /// ```no_run
-    /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
-    /// generator.impl_for("Foo")
-    ///          .generate_const("BAR", "u8")
-    ///          .with_value(|b| {
-    ///             b.push_parsed("5")?;
-    ///             Ok(())
-    ///          })?;
-    /// # Ok::<_, virtue::Error>(())
-    /// ```
-    ///
-    /// Generates:
-    /// ```ignore
-    /// impl Foo for <struct or enum> {
-    ///     const BAR: u8 = 5;
-    /// }
-    /// ```
-    pub fn with_value<F>(self, f: F) -> Result
-    where
-        F: FnOnce(&mut StreamBuilder) -> Result,
-    {
-        let mut builder = StreamBuilder::new();
-        builder
-            .ident_str("const")
-            .push_parsed(self.name)?
-            .punct(':')
-            .push_parsed(self.ty)?
-            .punct('=');
-        f(&mut builder)?;
-        builder.punct(';');
-        self.parent.consts.push(builder);
-        Ok(())
-    }
 }
