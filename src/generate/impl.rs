@@ -1,4 +1,4 @@
-use super::{generate_fn::FnParent, FnBuilder, Generator, Parent, StreamBuilder};
+use super::{generate_item::FnParent, FnBuilder, GenConst, Generator, Parent, StreamBuilder};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -8,8 +8,11 @@ use crate::{
 /// A helper struct for implementing functions for a given struct or enum.
 pub struct Impl<'a, P: Parent> {
     parent: &'a mut P,
+    outer_attr: Vec<StreamBuilder>,
+    inner_attr: Vec<StreamBuilder>,
     name: String,
     // pub(super) group: StreamBuilder,
+    consts: Vec<StreamBuilder>,
     custom_generic_constraints: Option<GenericConstraints>,
     fns: Vec<(StreamBuilder, StreamBuilder)>,
 }
@@ -17,8 +20,11 @@ pub struct Impl<'a, P: Parent> {
 impl<'a, P: Parent> Impl<'a, P> {
     pub(super) fn with_parent_name(parent: &'a mut P) -> Self {
         Self {
+            outer_attr: Vec::new(),
+            inner_attr: Vec::new(),
             name: parent.name().to_string(),
             parent,
+            consts: Vec::new(),
             custom_generic_constraints: None,
             fns: Vec::new(),
         }
@@ -26,11 +32,39 @@ impl<'a, P: Parent> Impl<'a, P> {
 
     pub(super) fn new(parent: &'a mut P, name: impl Into<String>) -> Self {
         Self {
+            outer_attr: Vec::new(),
+            inner_attr: Vec::new(),
             parent,
             name: name.into(),
+            consts: Vec::new(),
             custom_generic_constraints: None,
             fns: Vec::new(),
         }
+    }
+
+    /// Add a outer attribute to the trait implementation
+    pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder.punct('#').group(Delimiter::Brace, |builder| {
+            builder.push_parsed(attr)?;
+            Ok(())
+        })?;
+        self.outer_attr.push(builder);
+        Ok(())
+    }
+
+    /// Add a inner attribute to the trait implementation
+    pub fn impl_inner_attr(&mut self, attr: impl AsRef<str>) -> Result {
+        let mut builder = StreamBuilder::new();
+        builder
+            .punct('#')
+            .punct('!')
+            .group(Delimiter::Brace, |builder| {
+                builder.push_parsed(attr)?;
+                Ok(())
+            })?;
+        self.inner_attr.push(builder);
+        Ok(())
     }
 
     /// Add a function to the trait implementation.
@@ -46,6 +80,28 @@ impl<'a, P: Parent> Impl<'a, P> {
     /// See [`FnBuilder`] for more options, as well as information on how to fill the function body.
     pub fn generate_fn(&mut self, name: impl Into<String>) -> FnBuilder<Self> {
         FnBuilder::new(self, name)
+    }
+
+    /// Add a const to the trait implementation
+    /// ```no_run
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// generator.impl_for("Foo")
+    ///          .generate_const("BAR", "u8")
+    ///          .with_value(|b| {
+    ///             b.push_parsed("5")?;
+    ///             Ok(())
+    ///          })?;
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// impl Foo for <struct or enum> {
+    ///     const BAR: u8 = 5;
+    /// }
+    pub fn generate_const(&mut self, name: impl Into<String>, ty: impl Into<String>) -> GenConst {
+        GenConst::new(&mut self.consts, name, ty)
     }
 }
 
@@ -107,6 +163,9 @@ impl<'a, P: Parent> Drop for Impl<'a, P> {
             return;
         }
         let mut builder = StreamBuilder::new();
+        for attr in std::mem::take(&mut self.outer_attr) {
+            builder.append(attr);
+        }
         builder.ident_str("impl");
 
         if let Some(generics) = self.parent.generics() {
@@ -125,6 +184,12 @@ impl<'a, P: Parent> Drop for Impl<'a, P> {
 
         builder
             .group(Delimiter::Brace, |builder| {
+                for attr in std::mem::take(&mut self.inner_attr) {
+                    builder.append(attr);
+                }
+                for r#const in std::mem::take(&mut self.consts) {
+                    builder.append(r#const);
+                }
                 for (fn_def, fn_body) in std::mem::take(&mut self.fns) {
                     builder.append(fn_def);
                     builder
