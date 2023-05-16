@@ -9,10 +9,10 @@ use crate::prelude::{Ident, TokenStream};
 ///
 /// [`impl_for`]: #method.impl_for
 pub struct Generator {
-    pub(crate) name: Ident,
-    pub(crate) generics: Option<Generics>,
-    pub(crate) generic_constraints: Option<GenericConstraints>,
-    pub(crate) stream: StreamBuilder,
+    name: Ident,
+    generics: Option<Generics>,
+    generic_constraints: Option<GenericConstraints>,
+    stream: StreamBuilder,
 }
 
 impl Generator {
@@ -63,13 +63,14 @@ impl Generator {
     ///   - The code will be `impl<'a, 'b: 'a> Bar<'b> for Foo<'a> {}`
     /// - `trait_name` should _not_ have custom lifetimes. These will be added automatically.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::*;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Bar");
     /// generator.impl_for_with_lifetimes("Foo", ["a", "b"]);
     ///
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
+    /// # generator.assert_eq("impl < 'a , 'b > Foo < 'a , 'b > for Bar { }");
     /// ```
     pub fn impl_for_with_lifetimes<ITER, T>(
         &mut self,
@@ -130,6 +131,22 @@ impl Generator {
     /// Consume the contents of this generator. This *must* be called, or else the generator will panic on drop.
     pub fn finish(mut self) -> crate::prelude::Result<TokenStream> {
         Ok(std::mem::take(&mut self.stream).stream)
+    }
+}
+
+#[cfg(feature = "proc-macro2")]
+impl Generator {
+    /// Create a new generator with the name `name`. This is useful for testing purposes in combination with the `assert_eq` function.
+    pub fn with_name(name: &str) -> Self {
+        Self::new(
+            Ident::new(name, crate::prelude::Span::call_site()),
+            None,
+            None,
+        )
+    }
+    /// Assert that the generated code in this generator matches the given string. This is useful for testing purposes in combination with the `with_name` function.
+    pub fn assert_eq(&self, expected: &str) {
+        assert_eq!(expected, self.stream.stream.to_string());
     }
 }
 

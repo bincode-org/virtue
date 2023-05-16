@@ -71,9 +71,6 @@
             "stable",
             # "1.55.0" TODO: Pick latest stable version when we release 2.0
           ]
-          # "features": [
-          #   "",
-          # ]
         }
       },
       "steps": [
@@ -91,13 +88,8 @@
           "name": "Install Rust ${{ matrix.rust }}"
         },
         {
-          "run": "if [ -z \"${{ matrix.features }}\" ]\n
-then\n
-  cargo test --no-default-features\n
-else\n
-  cargo test --no-default-features --features ${{ matrix.features }}\n
-fi",
-          "name": "Run `cargo test` on all features",
+          "run": "cargo test --all --features proc-macro2",
+          "name": "Run `cargo test`",
           "env": {
             "RUSTFLAGS": "-D warnings"
           }
