@@ -44,15 +44,16 @@ impl<'a> GenConst<'a> {
 
     /// Complete the constant definition. This function takes a callback that will form the value of the constant.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Bar");
     /// generator.impl_for("Foo")
     ///          .generate_const("BAR", "u8")
     ///          .with_value(|b| {
     ///             b.push_parsed("5")?;
     ///             Ok(())
     ///          })?;
+    /// # generator.assert_eq("impl Foo for Bar { const BAR : u8 = 5 ; }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
     ///
@@ -136,13 +137,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Add a lifetime parameter.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_lifetime("a"); // fn foo<'a>()
+    ///     .with_lifetime("a") // fn foo<'a>()
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo < 'a > () { } }");
     /// ```
     #[must_use]
     pub fn with_lifetime(mut self, name: impl Into<String>) -> Self {
@@ -152,13 +155,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Make the function async
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .as_async(); // async fn foo()
+    ///     .as_async() // async fn foo()
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { async fn foo () { } }");
     /// ```
     #[must_use]
     pub fn as_async(mut self) -> Self {
@@ -170,14 +175,16 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///
     /// `dependencies` are the lifetime dependencies of the given lifetime.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
     ///     .with_lifetime("a") // fn foo<'a>()
-    ///     .with_lifetime_deps("b", ["a"]); // fn foo<'b: 'a>()
+    ///     .with_lifetime_deps("b", ["a"]) // fn foo<'b: 'a>()
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo < 'a , 'b : 'a > () { } }");
     /// ```
     #[must_use]
     pub fn with_lifetime_deps<ITER, I>(
@@ -198,13 +205,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Add a generic parameter. Keep in mind that will *not* work for lifetimes.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_generic("D"); // fn foo<D>()
+    ///     .with_generic("D") // fn foo<D>()
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo < D > () { } }");
     /// ```
     #[must_use]
     pub fn with_generic(mut self, name: impl Into<String>) -> Self {
@@ -216,14 +225,16 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     ///
     /// `dependencies` are the dependencies of the parameter.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
     ///     .with_generic("D") // fn foo<D>()
-    ///     .with_generic_deps("E", ["Encodable"]); // fn foo<D, E: Encodable>();
+    ///     .with_generic_deps("E", ["Encodable"]) // fn foo<D, E: Encodable>();
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo < D , E : Encodable > () { } }");
     /// ```
     #[must_use]
     pub fn with_generic_deps<DEP, I>(mut self, name: impl Into<String>, dependencies: DEP) -> Self
@@ -240,13 +251,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Set the value for `self`. See [FnSelfArg] for more information.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::{Generator, FnSelfArg};
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_self_arg(FnSelfArg::RefSelf); // fn foo(&self)
+    ///     .with_self_arg(FnSelfArg::RefSelf) // fn foo(&self)
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo (& self ,) { } }");
     /// ```
     #[must_use]
     pub fn with_self_arg(mut self, self_arg: FnSelfArg) -> Self {
@@ -256,14 +269,16 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Add an argument with a `name` and a `ty`.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
     ///     .with_arg("a", "u32") // fn foo(a: u32)
-    ///     .with_arg("b", "u32"); // fn foo(a: u32, b: u32)
+    ///     .with_arg("b", "u32") // fn foo(a: u32, b: u32)
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo (a : u32 , b : u32) { } }");
     /// ```
     #[must_use]
     pub fn with_arg(mut self, name: impl Into<String>, ty: impl Into<String>) -> Self {
@@ -273,13 +288,15 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Set the return type for the function. By default the function will have no return type.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
-    ///     .with_return_type("u32"); // fn foo() -> u32
+    ///     .with_return_type("u32") // fn foo() -> u32
+    /// # .body(|_| Ok(())).unwrap();
+    /// # generator.assert_eq("impl Foo { fn foo () ->u32 { } }");
     /// ```
     #[must_use]
     pub fn with_return_type(mut self, ret_type: impl Into<String>) -> Self {
@@ -296,9 +313,9 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
     /// Complete the function definition. This function takes a callback that will form the body of the function.
     ///
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Foo");
     /// generator
     ///     .r#impl()
     ///     .generate_fn("foo") // fn foo()
@@ -310,6 +327,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
     /// // fn foo() {
     /// //     println!("Hello world");
     /// // }
+    /// # generator.assert_eq("impl Foo { fn foo () { println ! (\"hello world\") ; } }");
     /// ```
     pub fn body(
         self,

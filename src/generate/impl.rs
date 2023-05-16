@@ -83,15 +83,16 @@ impl<'a, P: Parent> Impl<'a, P> {
     }
 
     /// Add a const to the trait implementation
-    /// ```no_run
+    /// ```
     /// # use virtue::prelude::Generator;
-    /// # let mut generator: Generator = unsafe { std::mem::zeroed() };
+    /// # let mut generator = Generator::with_name("Bar");
     /// generator.impl_for("Foo")
     ///          .generate_const("BAR", "u8")
     ///          .with_value(|b| {
     ///             b.push_parsed("5")?;
     ///             Ok(())
     ///          })?;
+    /// # generator.assert_eq("impl Foo for Bar { const BAR : u8 = 5 ; }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
     ///
