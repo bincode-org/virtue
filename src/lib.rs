@@ -15,52 +15,55 @@
 //!
 //! ## Example
 //!
+//! First, add this to your Cargo.toml:
+//! ```toml
+//! [lib]
+//! proc-macro = true
+//! ```
+//!
+//! Then instantiate your project with:
+//!
 //! ```ignore
 //! use virtue::prelude::*;
 //!
-//! #[proc_macro_derive(YourDerive, attributes(some, attributes, go, here))]
-//! pub fn derive_your_derive(input: TokenStream) -> TokenStream {
-//!     derive_your_derive_inner(input)
-//!         .unwrap_or_else(|error| error.into_token_stream())
+//! #[proc_macro_derive(RetHi)] // change this to change your #[derive(...)] name
+//! pub fn derive_ret_hi(input: TokenStream) -> TokenStream {
+//!     derive_ret_hi_inner(input).unwrap_or_else(|error| error.into_token_stream())
 //! }
 //!
-//! fn derive_your_derive_inner(input: TokenStream) -> Result<TokenStream> {
-//!     // Parse the struct or enum you want to implement a derive for
+//! fn derive_ret_hi_inner(input: TokenStream) -> Result<TokenStream> {
 //!     let parse = Parse::new(input)?;
-//!     // Get a reference to the generator
-//!     let (mut generator, body) = parse.into_generator();
-//!     match body {
-//!         Body::Struct(body) => {
-//!             // Implement your struct body here
-//!             // See `Generator` for more information
-//!             generator.impl_for("YourTrait")?
-//!                     .generate_fn("your_fn")
-//!                     .with_self_arg(FnSelfArg::RefSelf)
-//!                     .body(|fn_body| {
-//!                         fn_body.push_parsed("println!(\"Hello world\");");
-//!                     })?;
-//!         },
-//!         Body::Enum(body) => {
-//!             // Implement your enum body here
-//!             // See `Generator` for more information
-//!             generator.impl_for("YourTrait")?
-//!                     .generate_fn("your_fn")
-//!                     .with_self_arg(FnSelfArg::RefSelf)
-//!                     .body(|fn_body| {
-//!                         fn_body.push_parsed("println!(\"Hello world\");");
-//!                     })?;
-//!         },
-//!     }
+//!     let (mut generator, _attributes, _body) = parse.into_generator();
+//!     generator
+//!         .generate_impl()
+//!         .generate_fn("hi")
+//!         .with_self_arg(FnSelfArg::RefSelf)
+//!         .with_return_type("&'static str")
+//!         .body(|body| {
+//!             body.lit_str("hi");
+//!             Ok(())
+//!         })?;
 //!     generator.finish()
 //! }
 //! ```
 //!
-//! Will generate
+//! You can invoke this with
 //!
 //! ```ignore
-//! impl YourTrait for <Struct or Enum> {
-//!     fn your_fn(&self) { // .generate_fn("your_fn").with_self_arg(FnSelfArg::RefSelf)
-//!         println!("Hello world"); // fn_body.push_parsed(...)
+//! #[derive(RetHi)]
+//! struct Foo;
+//!
+//! fn main() {
+//!     println!("{}", Foo.hi());
+//! }
+//! ```
+//!
+//! The generated code is:
+//!
+//! ```ignore
+//! impl Foo {
+//!     fn hi(&self) -> &'static str {
+//!         "hi"
 //!     }
 //! }
 //! ```
