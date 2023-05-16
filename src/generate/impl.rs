@@ -42,7 +42,6 @@ impl<'a, P: Parent> Impl<'a, P> {
         }
     }
 
-    /// Add a function to the implementation.
     /// Add a outer attribute to the trait implementation
     pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
         let mut builder = StreamBuilder::new();
