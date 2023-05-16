@@ -71,9 +71,6 @@
             "stable",
             # "1.55.0" TODO: Pick latest stable version when we release 2.0
           ]
-          # "features": [
-          #   "",
-          # ]
         }
       },
       "steps": [
@@ -91,13 +88,8 @@
           "name": "Install Rust ${{ matrix.rust }}"
         },
         {
-          "run": "if [ -z \"${{ matrix.features }}\" ]\n
-then\n
-  cargo test --no-default-features\n
-else\n
-  cargo test --no-default-features --features ${{ matrix.features }}\n
-fi",
-          "name": "Run `cargo test` on all features",
+          "run": "cargo test --all --features proc-macro2",
+          "name": "Run `cargo test`",
           "env": {
             "RUSTFLAGS": "-D warnings"
           }
@@ -171,34 +163,6 @@ fi",
             "args": "--all-features -- -D warnings"
           },
           "name": "Run `cargo clippy`"
-        }
-      ]
-    },
-    "doctests": {
-      "name": "Doc tests",
-      "runs-on": "ubuntu-latest",
-      "steps": [
-        {
-          "uses": "actions/checkout@v2",
-          "name": "Checkout"
-        },
-        {
-          "uses": "actions-rs/toolchain@v1",
-          "with": {
-            "profile": "minimal",
-            "toolchain": "stable",
-            "override": true,
-            "components": "rustfmt, clippy"
-          },
-          "name": "Install Rust stable"
-        },
-        {
-          "uses": "actions-rs/cargo@v1",
-          "with": {
-            "command": "test",
-            "args": "--doc --feature proc-macro2"
-          },
-          "name": "Run `cargo test --doc --feature proc-macro2`"
         }
       ]
     },
