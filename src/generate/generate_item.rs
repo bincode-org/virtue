@@ -10,6 +10,7 @@ pub struct GenConst<'a> {
     attrs: Vec<String>,
     name: String,
     ty: String,
+    vis: Visibility,
 }
 
 impl<'a> GenConst<'a> {
@@ -23,7 +24,15 @@ impl<'a> GenConst<'a> {
             attrs: Vec::new(),
             name: name.into(),
             ty: ty.into(),
+            vis: Visibility::Default,
         }
+    }
+
+    /// Make the const `pub`. By default the const will have no visibility modifier and will only be visible in the current scope.
+    #[must_use]
+    pub fn make_pub(mut self) -> Self {
+        self.vis = Visibility::Pub;
+        self
     }
 
     /// Add an outer attribute
@@ -67,6 +76,10 @@ impl<'a> GenConst<'a> {
                     builder.push_parsed(attr)?;
                     Ok(())
                 })?;
+        }
+
+        if self.vis == Visibility::Pub {
+            builder.ident_str("pub");
         }
 
         builder
