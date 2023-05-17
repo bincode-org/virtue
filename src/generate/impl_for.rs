@@ -1,4 +1,4 @@
-use super::{generate_item::FnParent, FnBuilder, GenConst, Parent, StreamBuilder};
+use super::{generate_item::FnParent, FnBuilder, GenConst, Parent, StreamBuilder, StringOrIdent};
 use crate::{
     parse::{GenericConstraints, Generics},
     prelude::{Delimiter, Result},
@@ -10,7 +10,8 @@ pub struct ImplFor<'a, P: Parent> {
     generator: &'a mut P,
     outer_attr: Vec<StreamBuilder>,
     inner_attr: Vec<StreamBuilder>,
-    trait_name: String,
+    type_name: StringOrIdent,
+    trait_name: Option<StringOrIdent>,
     lifetimes: Option<Vec<String>>,
     consts: Vec<StreamBuilder>,
     custom_generic_constraints: Option<GenericConstraints>,
@@ -19,12 +20,17 @@ pub struct ImplFor<'a, P: Parent> {
 }
 
 impl<'a, P: Parent> ImplFor<'a, P> {
-    pub(super) fn new(generator: &'a mut P, trait_name: impl Into<String>) -> Self {
+    pub(super) fn new(
+        generator: &'a mut P,
+        type_name: StringOrIdent,
+        trait_name: Option<StringOrIdent>,
+    ) -> Self {
         Self {
             generator,
             outer_attr: Vec::new(),
             inner_attr: Vec::new(),
-            trait_name: trait_name.into(),
+            trait_name,
+            type_name,
             lifetimes: None,
             consts: Vec::new(),
             custom_generic_constraints: None,
@@ -33,27 +39,14 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         }
     }
 
-    pub(super) fn new_with_lifetimes<ITER, T>(
-        generator: &'a mut P,
-        trait_name: T,
-        lifetimes: ITER,
-    ) -> Self
+    /// Internal helper function to set lifetimes
+    pub(crate) fn with_lifetimes<ITER>(mut self, lifetimes: ITER) -> Self
     where
         ITER: IntoIterator,
         ITER::Item: Into<String>,
-        T: Into<String>,
     {
-        Self {
-            generator,
-            outer_attr: Vec::new(),
-            inner_attr: Vec::new(),
-            trait_name: trait_name.into(),
-            lifetimes: Some(lifetimes.into_iter().map(Into::into).collect()),
-            consts: Vec::new(),
-            custom_generic_constraints: None,
-            impl_types: Vec::new(),
-            fns: Vec::new(),
-        }
+        self.lifetimes = Some(lifetimes.into_iter().map(Into::into).collect());
+        self
     }
 
     /// Add a outer attribute to the trait implementation
@@ -243,12 +236,14 @@ impl<P: Parent> ImplFor<'_, P> {
         } else if let Some(generics) = self.generator.generics() {
             builder.append(generics.impl_generics());
         }
-        builder.push_parsed(&self.trait_name).unwrap();
-        if let Some(lifetimes) = &self.lifetimes {
-            append_lifetimes(builder, lifetimes);
+        if let Some(t) = &self.trait_name {
+            builder.push_parsed(t.to_string()).unwrap();
+            if let Some(lifetimes) = &self.lifetimes {
+                append_lifetimes(builder, lifetimes);
+            }
+            builder.ident_str("for");
         }
-        builder.ident_str("for");
-        builder.ident_str(self.generator.name().to_string());
+        builder.push_parsed(self.type_name.to_string()).unwrap();
         if let Some(generics) = &self.generator.generics() {
             builder.append(generics.type_generics());
         }
