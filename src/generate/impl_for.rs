@@ -49,6 +49,34 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         self
     }
 
+    /// Make the new lifetimes added by `Generator::impl_for_with_lifetimes` depend on the existing lifetimes from the original derive.
+    ///
+    /// See [`impl_for_with_lifetimes`] for more information.
+    ///
+    /// Calling this method in any other context has no effect.
+    ///
+    /// [`impl_for_with_lifetimes`]: struct.Generator.html#method.impl_for_with_lifetimes
+    pub fn new_lifetimes_depend_on_existing(mut self) -> Self {
+        if let Some(new_lt) = &self.lifetimes {
+            if let Some(generics) = self.generator.generics() {
+                let constraints = self.custom_generic_constraints.get_or_insert_with(|| {
+                    self.generator
+                        .generic_constraints()
+                        .cloned()
+                        .unwrap_or_default()
+                });
+                for old_lt in generics.iter_lifetimes() {
+                    for new_lt in new_lt {
+                        constraints
+                            .push_parsed_constraint(format!("'{}: '{}", new_lt, old_lt.ident))
+                            .expect("Could not ensure new lifetimes depend on existing lifetimes");
+                    }
+                }
+            }
+        }
+        self
+    }
+
     /// Add a outer attribute to the trait implementation
     pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
         let mut builder = StreamBuilder::new();

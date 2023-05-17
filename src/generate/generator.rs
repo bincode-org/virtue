@@ -97,10 +97,6 @@ impl Generator {
     ///
     /// Note:
     /// - Lifetimes should _not_ have the leading apostrophe.
-    /// - The lifetimes passed to this function will automatically depend on any other lifetime this struct or enum may have. Example:
-    ///   - The struct is `struct Foo<'a> {}`
-    ///   - You call `generator.impl_for_with_lifetime("Bar", &["b"])
-    ///   - The code will be `impl<'a, 'b: 'a> Bar<'b> for Foo<'a> {}`
     /// - `trait_name` should _not_ have custom lifetimes. These will be added automatically.
     ///
     /// ```
@@ -111,6 +107,19 @@ impl Generator {
     /// // will output:
     /// // impl<'a, 'b> Foo<'a, 'b> for StructOrEnum { }
     /// # generator.assert_eq("impl < 'a , 'b > Foo < 'a , 'b > for Bar { }");
+    /// ```
+    ///
+    /// The new lifetimes are not associated with any existing lifetimes. If you want this behavior you can call `.impl_for_with_lifetimes(...).new_lifetimes_depend_on_existing()`
+    ///
+    /// ```
+    /// # use virtue::prelude::*;
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// // given a derive on `struct<'a> Bar<'a>`
+    /// generator.impl_for_with_lifetimes("Foo", ["b"]).new_lifetimes_depend_on_existing();
+    ///
+    /// // will output:
+    /// // impl<'a, 'b> Foo<'b> for Bar<'a> where 'b: 'a { }
+    /// # generator.assert_eq("impl < 'b , 'a > Foo < 'b > for Bar < 'a > where 'b : 'a { }");
     /// ```
     pub fn impl_for_with_lifetimes<ITER, T>(
         &mut self,
@@ -184,6 +193,16 @@ impl Generator {
             None,
             None,
         )
+    }
+    /// Add a lifetime to this generator.
+    pub fn with_lifetime(mut self, lt: &str) -> Self {
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .push(crate::parse::Generic::Lifetime(crate::parse::Lifetime {
+                ident: crate::prelude::Ident::new(lt, crate::prelude::Span::call_site()),
+                constraint: Vec::new(),
+            }));
+        self
     }
     /// Assert that the generated code in this generator matches the given string. This is useful for testing purposes in combination with the `with_name` function.
     pub fn assert_eq(&self, expected: &str) {
