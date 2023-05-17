@@ -32,11 +32,11 @@
       },
       "steps": [
         {
-          "uses": "actions/checkout@v2",
+          "uses": "actions/checkout@v3",
           "name": "Checkout"
         },
         {
-          "uses": "actions-rs/toolchain@v1",
+          "uses": "actions-rs/toolchain@v2",
           "with": {
             "profile": "minimal",
             "toolchain": "${{ matrix.rust }}",
@@ -75,11 +75,11 @@
       },
       "steps": [
         {
-          "uses": "actions/checkout@v2",
+          "uses": "actions/checkout@v3",
           "name": "Checkout"
         },
         {
-          "uses": "actions-rs/toolchain@v1",
+          "uses": "actions-rs/toolchain@v2",
           "with": {
             "profile": "minimal",
             "toolchain": "${{ matrix.rust }}",
@@ -109,11 +109,11 @@
       },
       "steps": [
         {
-          "uses": "actions/checkout@v2",
+          "uses": "actions/checkout@v3",
           "name": "Checkout"
         },
         {
-          "uses": "actions-rs/toolchain@v1",
+          "uses": "actions-rs/toolchain@v2",
           "with": {
             "profile": "minimal",
             "toolchain": "${{ matrix.rust }}",
@@ -135,11 +135,11 @@
       "runs-on": "ubuntu-latest",
       "steps": [
         {
-          "uses": "actions/checkout@v2",
+          "uses": "actions/checkout@v3",
           "name": "Checkout"
         },
         {
-          "uses": "actions-rs/toolchain@v1",
+          "uses": "actions-rs/toolchain@v2",
           "with": {
             "profile": "minimal",
             "toolchain": "stable",
@@ -171,11 +171,11 @@
       "runs-on": "ubuntu-latest",
       "steps": [
         {
-          "uses": "actions/checkout@v2",
+          "uses": "actions/checkout@v3",
           "name": "Checkout"
         },
         {
-          "uses": "actions-rs/toolchain@v1",
+          "uses": "actions-rs/toolchain@v2",
           "with": {
             "profile": "minimal",
             "toolchain": "nightly",
