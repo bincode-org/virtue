@@ -237,13 +237,13 @@ impl<P: Parent> ImplFor<'_, P> {
             builder.append(generics.impl_generics());
         }
         if let Some(t) = &self.trait_name {
-            builder.ident_str(t.to_string());
+            builder.push_parsed(t.to_string()).unwrap();
             if let Some(lifetimes) = &self.lifetimes {
                 append_lifetimes(builder, lifetimes);
             }
             builder.ident_str("for");
         }
-        builder.ident_str(self.type_name.to_string());
+        builder.push_parsed(self.type_name.to_string()).unwrap();
         if let Some(generics) = &self.generator.generics() {
             builder.append(generics.type_generics());
         }

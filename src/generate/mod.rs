@@ -43,10 +43,12 @@ pub trait Parent {
     fn generic_constraints(&self) -> Option<&GenericConstraints>;
 }
 
-/// Helper enum to differentiate between a [`Ident`] or a [`String`]
+/// Helper enum to differentiate between a [`Ident`] or a [`String`].
 #[allow(missing_docs)]
 pub enum StringOrIdent {
     String(String),
+    // Note that when this is a `string` this could be much more than a single ident.
+    // Therefor you should never use [`StreamBuilder`]`.ident_str(StringOrIdent.to_string())`, but instead use `.push_parsed(StringOrIdent.to_string())?`.
     Ident(Ident),
 }
 
