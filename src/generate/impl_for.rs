@@ -55,7 +55,7 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     ///
     /// Calling this method in any other context has no effect.
     ///
-    /// [`impl_for_with_lifetimes`]: ../struct.Generator.html#fn.impl_for_with_lifetimes
+    /// [`impl_for_with_lifetimes`]: struct.Generator.html#method.impl_for_with_lifetimes
     pub fn new_lifetimes_depend_on_existing(mut self) -> Self {
         if let Some(new_lt) = &self.lifetimes {
             if let Some(generics) = self.generator.generics() {
