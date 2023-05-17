@@ -1,4 +1,4 @@
-use super::{GenerateMod, Impl, ImplFor, StreamBuilder};
+use super::{GenerateMod, Impl, ImplFor, StreamBuilder, StringOrIdent};
 use crate::parse::{GenericConstraints, Generics};
 use crate::prelude::{Ident, TokenStream};
 
@@ -35,6 +35,8 @@ impl Generator {
     }
 
     /// Generate an `impl <target_name>` implementation. See [`Impl`] for more information.
+    ///
+    /// This will default to the type that is associated with this generator. If you need to generate an impl for another type you can use `impl_for_other_type`
     pub fn r#impl(&mut self) -> Impl<Self> {
         Impl::with_parent_name(self)
     }
@@ -49,8 +51,46 @@ impl Generator {
     }
 
     /// Generate an `for <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
+    ///
+    /// This will default to the type that is associated with this generator. If you need to generate an impl for another type you can use `impl_trait_for_other_type`
     pub fn impl_for(&mut self, trait_name: impl Into<String>) -> ImplFor<Self> {
-        ImplFor::new(self, trait_name)
+        ImplFor::new(
+            self,
+            self.name.clone().into(),
+            Some(trait_name.into().into()),
+        )
+    }
+
+    /// Generate an `impl <type_name>` block. See [ImplFor] for more information.
+    /// ```
+    /// # use virtue::prelude::*;
+    /// # let mut generator = Generator::with_name("Baz");
+    /// generator.impl_for_other_type("Foo");
+    ///
+    /// // will output:
+    /// // impl Foo { }
+    /// # generator.assert_eq("impl Foo { }");
+    /// ```
+    pub fn impl_for_other_type(&mut self, type_name: impl Into<StringOrIdent>) -> ImplFor<Self> {
+        ImplFor::new(self, type_name.into(), None)
+    }
+
+    /// Generate an `impl <trait_name> for <type_name>` block. See [ImplFor] for more information.
+    /// ```
+    /// # use virtue::prelude::*;
+    /// # let mut generator = Generator::with_name("Baz");
+    /// generator.impl_trait_for_other_type("Foo", "Bar");
+    ///
+    /// // will output:
+    /// // impl Foo for Bar { }
+    /// # generator.assert_eq("impl Foo for Bar { }");
+    /// ```
+    pub fn impl_trait_for_other_type(
+        &mut self,
+        trait_name: impl Into<StringOrIdent>,
+        type_name: impl Into<StringOrIdent>,
+    ) -> ImplFor<Self> {
+        ImplFor::new(self, type_name.into(), Some(trait_name.into()))
     }
 
     /// Generate an `for <..lifetimes> <trait_name> for <target_name>` implementation. See [ImplFor] for more information.
@@ -80,9 +120,10 @@ impl Generator {
     where
         ITER: IntoIterator,
         ITER::Item: Into<String>,
-        T: Into<String>,
+        T: Into<StringOrIdent>,
     {
-        ImplFor::new_with_lifetimes(self, trait_name, lifetimes)
+        ImplFor::new(self, self.name.clone().into(), Some(trait_name.into()))
+            .with_lifetimes(lifetimes)
     }
 
     /// Generate a `mod <name> { ... }`. See [`GenerateMod`] for more info.

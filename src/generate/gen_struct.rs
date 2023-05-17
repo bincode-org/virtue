@@ -1,4 +1,4 @@
-use super::{Impl, ImplFor, Parent, StreamBuilder};
+use super::{Impl, ImplFor, Parent, StreamBuilder, StringOrIdent};
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
 
@@ -51,8 +51,8 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     }
 
     /// Add an `impl <name> for <struct>`
-    pub fn impl_for(&mut self, name: impl Into<String>) -> ImplFor<Self> {
-        ImplFor::new(self, name)
+    pub fn impl_for(&mut self, name: impl Into<StringOrIdent>) -> ImplFor<Self> {
+        ImplFor::new(self, name.into(), None)
     }
 
     /// Generate an `impl <name>` implementation. See [`Impl`] for more information.
