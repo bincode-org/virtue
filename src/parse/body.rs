@@ -110,7 +110,7 @@ fn test_struct_body_take() {
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
     if let Some(Fields::Struct(v)) = body.fields {
-        assert!(v.len() == 0);
+        assert!(v.is_empty());
     } else {
         panic!("wrong fields {:?}", body.fields);
     }
@@ -121,7 +121,7 @@ fn test_struct_body_take() {
     assert_eq!(ident, "Foo");
     let body = StructBody::take(stream).unwrap();
     if let Some(Fields::Tuple(v)) = body.fields {
-        assert!(v.len() == 0);
+        assert!(v.is_empty());
     } else {
         panic!("wrong fields {:?}", body.fields);
     }
@@ -297,9 +297,7 @@ fn test_enum_body_take() {
     let fields = body.variants[1].fields.as_ref().unwrap();
     assert_eq!(fields.len(), 1);
     assert_eq!(fields.names().len(), 1);
-    assert!(
-        matches!(fields.names()[0], IdentOrIndex::Ident { ident, .. } if ident.to_string() == "a")
-    );
+    assert!(matches!(&fields.names()[0], IdentOrIndex::Ident { ident, .. } if *ident == "a"));
     assert_eq!(body.variants[1].get_integer(), 2);
 
     let stream = &mut token_stream("enum Foo { Round(), Curly{}, Without }");
@@ -395,14 +393,14 @@ impl Fields {
                 .map(|(index, field)| IdentOrIndex::Index {
                     index,
                     span: field.span(),
-                    attributes: &field.attributes,
+                    attributes: field.attributes.clone(),
                 })
                 .collect(),
             Self::Struct(fields) => fields
                 .iter()
                 .map(|(ident, field)| IdentOrIndex::Ident {
-                    ident,
-                    attributes: &field.attributes,
+                    ident: ident.clone(),
+                    attributes: field.attributes.clone(),
                 })
                 .collect(),
         };
@@ -552,14 +550,14 @@ impl UnnamedField {
 ///         a: u32, // will be IdentOrIndex::Ident { ident: "a", .. }
 ///     },
 /// }
-#[derive(Debug)]
-pub enum IdentOrIndex<'a> {
+#[derive(Debug, Clone)]
+pub enum IdentOrIndex {
     /// The variant is a named field
     Ident {
         /// The name of the field
-        ident: &'a Ident,
+        ident: Ident,
         /// The attributes of the field
-        attributes: &'a Vec<Attribute>,
+        attributes: Vec<Attribute>,
     },
     /// The variant is an unnamed field
     Index {
@@ -568,15 +566,15 @@ pub enum IdentOrIndex<'a> {
         /// The span of the field type
         span: Span,
         /// The attributes of this field
-        attributes: &'a Vec<Attribute>,
+        attributes: Vec<Attribute>,
     },
 }
 
-impl<'a> IdentOrIndex<'a> {
+impl IdentOrIndex {
     /// Get the ident. Will panic if this is an `IdentOrIndex::Index`
-    pub fn unwrap_ident(&self) -> &'a Ident {
+    pub fn unwrap_ident(&self) -> Ident {
         match self {
-            Self::Ident { ident, .. } => ident,
+            Self::Ident { ident, .. } => ident.clone(),
             x => panic!("Expected ident, found {:?}", x),
         }
     }
@@ -611,7 +609,7 @@ impl<'a> IdentOrIndex<'a> {
     }
 }
 
-impl std::fmt::Display for IdentOrIndex<'_> {
+impl std::fmt::Display for IdentOrIndex {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             IdentOrIndex::Ident { ident, .. } => write!(fmt, "{}", ident),
