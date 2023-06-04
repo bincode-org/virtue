@@ -4,7 +4,7 @@ use crate::{Error, Result};
 use std::iter::Peekable;
 
 /// An attribute for the given struct, enum, field, etc
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Attribute {
     /// The location this attribute was parsed at

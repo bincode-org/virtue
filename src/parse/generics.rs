@@ -627,7 +627,7 @@ fn test_generic_constraints_try_take() {
     assert_eq!(constraints[0].ident(), "T");
     let body = StructBody::take(stream).unwrap();
     if let Some(Fields::Struct(v)) = body.fields {
-        assert!(v.len() == 0);
+        assert!(v.is_empty());
     } else {
         panic!("wrong fields {:?}", body.fields);
     }
