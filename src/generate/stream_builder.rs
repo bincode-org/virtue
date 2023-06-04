@@ -149,6 +149,19 @@ impl StreamBuilder {
     }
 
     /// Set the given span on all tokens in the stream. This span is used by rust for e.g. compiler errors, to indicate the position of the error.
+    ///
+    /// Normally your derive will report an error on the derive, e.g.:
+    ///
+    /// ```text
+    /// #[derive(YourMacro)]
+    ///          ^^^^^^^^^
+    ///          |
+    ///          `self` value is a keyword only available in methods with a `self` parameter
+    /// ```
+    ///
+    /// If you want to improve feedback to the user of your macro, you can use this macro to set the location for a given streambuilder.
+    ///
+    /// A `span` can be obtained from e.g. an ident with `ident.span()`.
     pub fn set_span_on_all_tokens(&mut self, span: Span) {
         self.stream = std::mem::take(&mut self.stream)
             .into_iter()
