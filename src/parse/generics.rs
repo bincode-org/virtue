@@ -554,7 +554,7 @@ impl GenericConstraints {
         builder.ident(generic.ident.clone());
         builder.punct(':');
         builder.push_parsed(constraint)?;
-        self.constraints.extend(builder.stream.into_iter());
+        self.constraints.extend(builder.stream);
 
         Ok(())
     }
@@ -575,7 +575,7 @@ impl GenericConstraints {
             builder.punct(',');
         }
         builder.push_parsed(constraint)?;
-        self.constraints.extend(builder.stream.into_iter());
+        self.constraints.extend(builder.stream);
 
         Ok(())
     }
