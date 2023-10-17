@@ -11,6 +11,7 @@ fn derive_ret_hi_inner(input: TokenStream) -> Result<TokenStream> {
     generator
         .generate_impl()
         .generate_fn("hi")
+        .with_attr("inline(never)")
         .with_self_arg(FnSelfArg::RefSelf)
         .with_return_type("&'static str")
         .body(|body| {

@@ -80,7 +80,7 @@ impl<'a, P: Parent> ImplFor<'a, P> {
     /// Add a outer attribute to the trait implementation
     pub fn impl_outer_attr(&mut self, attr: impl AsRef<str>) -> Result {
         let mut builder = StreamBuilder::new();
-        builder.punct('#').group(Delimiter::Brace, |builder| {
+        builder.punct('#').group(Delimiter::Bracket, |builder| {
             builder.push_parsed(attr)?;
             Ok(())
         })?;

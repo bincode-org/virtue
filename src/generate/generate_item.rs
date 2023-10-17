@@ -73,7 +73,7 @@ impl<'a> GenConst<'a> {
             builder
                 .punct('#')
                 .punct('!')
-                .group(Delimiter::Brace, |builder| {
+                .group(Delimiter::Bracket, |builder| {
                     builder.push_parsed(attr)?;
                     Ok(())
                 })?;
@@ -350,7 +350,7 @@ impl<'a, P: FnParent> FnBuilder<'a, P> {
 
         // attrs
         for attr in attrs {
-            builder.punct('#').group(Delimiter::Brace, |builder| {
+            builder.punct('#').group(Delimiter::Bracket, |builder| {
                 builder.push_parsed(attr)?;
                 Ok(())
             })?;
