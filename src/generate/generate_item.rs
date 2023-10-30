@@ -445,6 +445,9 @@ pub enum FnSelfArg {
     /// `self`. The function will consume self.
     TakeSelf,
 
+    /// `mut self`. The function will consume self.
+    MutTakeSelf,
+
     /// `&self`. The function will take self by reference.
     RefSelf,
 
@@ -458,6 +461,10 @@ impl FnSelfArg {
         match self {
             Self::None => return None,
             Self::TakeSelf => {
+                builder.ident_str("self");
+            }
+            Self::MutTakeSelf => {
+                builder.ident_str("mut");
                 builder.ident_str("self");
             }
             Self::RefSelf => {
