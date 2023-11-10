@@ -13,6 +13,7 @@ pub struct ImplFor<'a, P: Parent> {
     type_name: StringOrIdent,
     trait_name: Option<StringOrIdent>,
     lifetimes: Option<Vec<String>>,
+    generics: Option<Vec<String>>,
     consts: Vec<StreamBuilder>,
     custom_generic_constraints: Option<GenericConstraints>,
     impl_types: Vec<StreamBuilder>,
@@ -32,6 +33,7 @@ impl<'a, P: Parent> ImplFor<'a, P> {
             trait_name,
             type_name,
             lifetimes: None,
+            generics: None,
             consts: Vec::new(),
             custom_generic_constraints: None,
             impl_types: Vec::new(),
@@ -74,6 +76,23 @@ impl<'a, P: Parent> ImplFor<'a, P> {
                 }
             }
         }
+        self
+    }
+
+    /// Add generic parameters to the trait.
+    ///
+    /// `generator.impl_for("Foo").with_trait_generic(["Bar", "Baz"])` results in code like:
+    ///
+    /// ```ignore
+    /// impl Foo<Bar, Baz> for <struct or enum> {
+    /// }
+    /// ```
+    pub fn with_trait_generics<ITER>(mut self, generics: ITER) -> Self
+    where
+        ITER: IntoIterator,
+        ITER::Item: Into<String>,
+    {
+        self.generics = Some(generics.into_iter().map(Into::into).collect());
         self
     }
 
@@ -259,15 +278,17 @@ impl<P: Parent> ImplFor<'_, P> {
             if let Some(generics) = self.generator.generics() {
                 builder.append(generics.impl_generics_with_additional_lifetimes(lifetimes));
             } else {
-                append_lifetimes(builder, lifetimes);
+                append_generics(builder, lifetimes, &[]);
             }
         } else if let Some(generics) = self.generator.generics() {
             builder.append(generics.impl_generics());
         }
         if let Some(t) = &self.trait_name {
             builder.push_parsed(t.to_string()).unwrap();
-            if let Some(lifetimes) = &self.lifetimes {
-                append_lifetimes(builder, lifetimes);
+            if self.lifetimes.is_some() || self.generics.is_some() {
+                let lifetimes = self.lifetimes.as_deref().unwrap_or_default();
+                let generics = self.generics.as_deref().unwrap_or_default();
+                append_generics(builder, lifetimes, generics);
             }
             builder.ident_str("for");
         }
@@ -283,10 +304,22 @@ impl<P: Parent> ImplFor<'_, P> {
     }
 }
 
-fn append_lifetimes(builder: &mut StreamBuilder, lifetimes: &[String]) {
+fn append_generics(builder: &mut StreamBuilder, lifetimes: &[String], generics: &[String]) {
+    builder.punct('<');
+
     for (idx, lt) in lifetimes.iter().enumerate() {
-        builder.punct(if idx == 0 { '<' } else { ',' });
+        if idx > 0 {
+            builder.punct(',');
+        }
         builder.lifetime_str(lt);
     }
+
+    for (idx, gen) in generics.iter().enumerate() {
+        if idx > 0 || !lifetimes.is_empty() {
+            builder.punct(',');
+        }
+        builder.ident_str(gen);
+    }
+
     builder.punct('>');
 }
