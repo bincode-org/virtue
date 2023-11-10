@@ -79,12 +79,20 @@ impl<'a, P: Parent> ImplFor<'a, P> {
         self
     }
 
-    /// Add generic parameters to the trait.
+    /// Add generic parameters to the trait implementation.
+    ///```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator.impl_for("Foo")
+    ///          .with_trait_generics(["Baz"]);
+    /// # generator.assert_eq("impl Foo < Baz > for Bar { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
     ///
-    /// `generator.impl_for("Foo").with_trait_generic(["Bar", "Baz"])` results in code like:
-    ///
+    /// Generates:
     /// ```ignore
-    /// impl Foo<Bar, Baz> for <struct or enum> {
+    /// impl Foo for <struct or enum> {
+    ///     const BAR: u8 = 5;
     /// }
     /// ```
     pub fn with_trait_generics<ITER>(mut self, generics: ITER) -> Self
