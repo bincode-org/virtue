@@ -293,11 +293,10 @@ impl<P: Parent> ImplFor<'_, P> {
         }
         if let Some(t) = &self.trait_name {
             builder.push_parsed(t.to_string()).unwrap();
-            if self.lifetimes.is_some() || self.generics.is_some() {
-                let lifetimes = self.lifetimes.as_deref().unwrap_or_default();
-                let generics = self.generics.as_deref().unwrap_or_default();
-                append_generics(builder, lifetimes, generics);
-            }
+
+            let lifetimes = self.lifetimes.as_deref().unwrap_or_default();
+            let generics = self.generics.as_deref().unwrap_or_default();
+            append_generics(builder, lifetimes, generics);
             builder.ident_str("for");
         }
         builder.push_parsed(self.type_name.to_string()).unwrap();
@@ -313,6 +312,10 @@ impl<P: Parent> ImplFor<'_, P> {
 }
 
 fn append_generics(builder: &mut StreamBuilder, lifetimes: &[String], generics: &[String]) {
+    if lifetimes.is_empty() && generics.is_empty() {
+        return;
+    }
+
     builder.punct('<');
 
     for (idx, lt) in lifetimes.iter().enumerate() {
