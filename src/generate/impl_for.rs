@@ -286,7 +286,7 @@ impl<P: Parent> ImplFor<'_, P> {
             if let Some(generics) = self.generator.generics() {
                 builder.append(generics.impl_generics_with_additional_lifetimes(lifetimes));
             } else {
-                append_generics(builder, lifetimes, &[]);
+                append_lifetimes_and_generics(builder, lifetimes, &[]);
             }
         } else if let Some(generics) = self.generator.generics() {
             builder.append(generics.impl_generics());
@@ -296,7 +296,7 @@ impl<P: Parent> ImplFor<'_, P> {
 
             let lifetimes = self.lifetimes.as_deref().unwrap_or_default();
             let generics = self.generics.as_deref().unwrap_or_default();
-            append_generics(builder, lifetimes, generics);
+            append_lifetimes_and_generics(builder, lifetimes, generics);
             builder.ident_str("for");
         }
         builder.push_parsed(self.type_name.to_string()).unwrap();
@@ -311,7 +311,11 @@ impl<P: Parent> ImplFor<'_, P> {
     }
 }
 
-fn append_generics(builder: &mut StreamBuilder, lifetimes: &[String], generics: &[String]) {
+fn append_lifetimes_and_generics(
+    builder: &mut StreamBuilder,
+    lifetimes: &[String],
+    generics: &[String],
+) {
     if lifetimes.is_empty() && generics.is_empty() {
         return;
     }
