@@ -142,7 +142,7 @@ fn issue_77() {
         panic!("Fields is not a tuple")
     };
     assert_eq!(t.len(), 1);
-    assert_eq!(t[0].r#type[0].to_string(), "[u8 ; 32 ]");
+    assert_eq!(t[0].r#type[0].to_string(), "[u8 ; 32]");
 }
 
 /// The body of an enum
