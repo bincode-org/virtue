@@ -127,6 +127,24 @@ fn test_struct_body_take() {
     }
 }
 
+#[test]
+fn issue_77() {
+    // https://github.com/bincode-org/virtue/issues/77
+    use crate::token_stream;
+
+    let stream = &mut token_stream("struct Test(pub [u8; 32])");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Struct);
+    assert_eq!(ident, "Test");
+    let body = StructBody::take(stream).unwrap();
+    let fields = body.fields.unwrap();
+    let Fields::Tuple(t) = fields else {
+        panic!("Fields is not a tuple")
+    };
+    assert_eq!(t.len(), 1);
+    assert_eq!(t[0].r#type[0].to_string(), "[u8 ; 32 ]");
+}
+
 /// The body of an enum
 #[derive(Debug)]
 pub struct EnumBody {
