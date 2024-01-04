@@ -43,12 +43,12 @@ impl<'a, P: Parent> GenerateMod<'a, P> {
         Ok(())
     }
 
-    /// Generate a struct with the given name.
+    /// Generate a struct with the given name. See [`GenStruct`] for more info.
     pub fn generate_struct(&mut self, name: impl Into<String>) -> GenStruct<Self> {
         GenStruct::new(self, name)
     }
 
-    /// Generate an enum with the given name.
+    /// Generate an enum with the given name. See [`GenEnum`] for more info.
     pub fn generate_enum(&mut self, name: impl Into<String>) -> GenEnum<Self> {
         GenEnum::new(self, name)
     }

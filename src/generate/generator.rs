@@ -1,4 +1,4 @@
-use super::{GenerateMod, Impl, ImplFor, StreamBuilder, StringOrIdent};
+use super::{GenerateMod, Impl, ImplFor, StreamBuilder, StringOrIdent, GenStruct, GenEnum};
 use crate::parse::{GenericConstraints, Generics};
 use crate::prelude::{Ident, TokenStream};
 
@@ -133,6 +133,16 @@ impl Generator {
     {
         ImplFor::new(self, self.name.clone().into(), Some(trait_name.into()))
             .with_lifetimes(lifetimes)
+    }
+
+    /// Generate a struct with the given name. See [`GenStruct`] for more info.
+    pub fn generate_struct(&mut self, name: impl Into<String>) -> GenStruct<Self> {
+        GenStruct::new(self, name)
+    }
+
+    /// Generate an enum with the given name. See [`GenEnum`] for more info.
+    pub fn generate_enum(&mut self, name: impl Into<String>) -> GenEnum<Self> {
+        GenEnum::new(self, name)
     }
 
     /// Generate a `mod <name> { ... }`. See [`GenerateMod`] for more info.
