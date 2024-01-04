@@ -12,6 +12,7 @@
 //! [`Generator::finish()`]: struct.Generator.html#method.finish
 //! [`TokenStream`]: ../prelude/struct.TokenStream.html
 
+mod gen_enum;
 mod gen_struct;
 mod generate_item;
 mod generate_mod;
@@ -26,6 +27,7 @@ use crate::{
 };
 use std::fmt;
 
+pub use self::gen_enum::GenEnum;
 pub use self::gen_struct::GenStruct;
 pub use self::generate_item::{FnBuilder, FnSelfArg, GenConst};
 pub use self::generate_mod::GenerateMod;

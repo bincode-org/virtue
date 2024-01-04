@@ -1,4 +1,4 @@
-use super::{GenStruct, Impl, Parent, StreamBuilder};
+use super::{GenStruct, GenEnum, Impl, Parent, StreamBuilder};
 use crate::{
     parse::Visibility,
     prelude::{Delimiter, Ident, Span},
@@ -46,6 +46,11 @@ impl<'a, P: Parent> GenerateMod<'a, P> {
     /// Generate a struct with the given name.
     pub fn generate_struct(&mut self, name: impl Into<String>) -> GenStruct<Self> {
         GenStruct::new(self, name)
+    }
+
+    /// Generate an enum with the given name.
+    pub fn generate_enum(&mut self, name: impl Into<String>) -> GenEnum<Self> {
+        GenEnum::new(self, name)
     }
 
     /// Generate an `impl <name>` implementation. See [`Impl`] for more information.
