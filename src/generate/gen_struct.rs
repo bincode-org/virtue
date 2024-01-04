@@ -2,7 +2,8 @@ use super::{Impl, ImplFor, Parent, StreamBuilder, StringOrIdent};
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
 
-/// Builder to generate a `struct <Name> { <field>: <ty>, ... }`
+/// Builder to generate a struct.
+/// Defaults to a struct with named fields `struct <Name> { <field>: <ty>, ... }`
 pub struct GenStruct<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,
@@ -27,6 +28,23 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// Make the struct a zero-sized type (no fields)
     ///
     /// Any fields will be ignored
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .make_zst()
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo ;");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo;
+    /// ```
     pub fn make_zst(&mut self) -> &mut Self {
         self.struct_type = StructType::Zst;
         self
@@ -35,6 +53,23 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// Make the struct fields unnamed
     ///
     /// The names of any field will be ignored
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .make_fields_unnamed()
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo (u16 , String ,) ;");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo(u16, String);
+    /// ```
     pub fn make_fields_unnamed(&mut self) -> &mut Self {
         self.struct_type = StructType::Unnamed;
         self
@@ -49,6 +84,25 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
     ///
     /// Names are ignored when the Struct's fields are unnamed
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo { bar : u16 , baz : String , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo {
+    ///     bar: u16,
+    ///     baz: String,
+    /// };
+    /// ```
     pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
         self.fields.push(StructField {
             name: name.into(),

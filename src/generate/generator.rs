@@ -1,4 +1,4 @@
-use super::{GenerateMod, Impl, ImplFor, StreamBuilder, StringOrIdent, GenStruct, GenEnum};
+use super::{GenEnum, GenStruct, GenerateMod, Impl, ImplFor, StreamBuilder, StringOrIdent};
 use crate::parse::{GenericConstraints, Generics};
 use crate::prelude::{Ident, TokenStream};
 

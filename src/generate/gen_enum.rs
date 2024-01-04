@@ -3,7 +3,41 @@ use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
 use crate::Result;
 
-/// Builder to generate a `struct <Name> { <field>: <ty>, ... }`
+/// Builder to generate an `enum <Name> { <value> { ... }, ... }`
+///
+/// ```
+/// # use virtue::prelude::Generator;
+/// # let mut generator = Generator::with_name("Fooz");
+/// {
+///     let mut enumgen = generator.generate_enum("Foo");
+///     enumgen
+///         .add_value("ZST")
+///         .make_zst();
+///     enumgen
+///         .add_value("Named")
+///         .add_field("bar", "u16")
+///         .add_field("baz", "String");
+///     enumgen
+///         .add_value("Unnamed")
+///         .add_field("", "u16")
+///         .add_field("baz", "String")
+///         .make_fields_unnamed();
+/// }
+/// # generator.assert_eq("enum Foo { ZST , Named { bar : u16 , baz : String , } , Unnamed (u16 , String ,) , }");
+/// # Ok::<_, virtue::Error>(())
+/// ```
+///
+/// Generates:
+/// ```
+/// enum Foo {
+///     ZST,
+///     Named {
+///         bar: u16,
+///         baz: String,
+///     },
+///     Unnamed(u16, String),
+/// };
+/// ```
 pub struct GenEnum<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,

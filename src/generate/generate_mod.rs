@@ -1,4 +1,4 @@
-use super::{GenStruct, GenEnum, Impl, Parent, StreamBuilder};
+use super::{GenEnum, GenStruct, Impl, Parent, StreamBuilder};
 use crate::{
     parse::Visibility,
     prelude::{Delimiter, Ident, Span},
