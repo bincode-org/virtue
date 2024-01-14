@@ -59,7 +59,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// # let mut generator = Generator::with_name("Fooz");
     /// generator
     ///     .generate_struct("Foo")
-    ///     .make_fields_unnamed()
+    ///     .make_tuple()
     ///     .add_field("bar", "u16")
     ///     .add_field("baz", "String");
     /// # generator.assert_eq("struct Foo (u16 , String ,) ;");
@@ -70,7 +70,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// ```
     /// struct Foo(u16, String);
     /// ```
-    pub fn make_fields_unnamed(&mut self) -> &mut Self {
+    pub fn make_tuple(&mut self) -> &mut Self {
         self.struct_type = StructType::Unnamed;
         self
     }

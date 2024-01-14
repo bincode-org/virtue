@@ -21,7 +21,7 @@ use crate::Result;
 ///         .add_value("Unnamed")
 ///         .add_field("", "u16")
 ///         .add_field("baz", "String")
-///         .make_fields_unnamed();
+///         .make_tuple();
 /// }
 /// # generator.assert_eq("enum Foo { ZST , Named { bar : u16 , baz : String , } , Unnamed (u16 , String ,) , }");
 /// # Ok::<_, virtue::Error>(())
@@ -193,7 +193,7 @@ impl EnumValue {
     /// Make the struct fields unnamed
     ///
     /// The names of any field will be ignored
-    pub fn make_fields_unnamed(&mut self) -> &mut Self {
+    pub fn make_tuple(&mut self) -> &mut Self {
         self.value_type = ValueType::Unnamed;
         self
     }
