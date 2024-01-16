@@ -143,6 +143,18 @@ fn issue_77() {
     };
     assert_eq!(t.len(), 1);
     assert_eq!(t[0].r#type[0].to_string(), "[u8 ; 32]");
+
+    let stream = &mut token_stream("struct Foo(pub (u8, ))");
+    let (data_type, ident) = super::DataType::take(stream).unwrap();
+    assert_eq!(data_type, super::DataType::Struct);
+    assert_eq!(ident, "Foo");
+    let body = StructBody::take(stream).unwrap();
+    let fields = body.fields.unwrap();
+    let Fields::Tuple(t) = fields else {
+        panic!("Fields is not a tuple")
+    };
+    assert_eq!(t.len(), 1);
+    assert_eq!(t[0].r#type[0].to_string(), "(u8 ,)");
 }
 
 /// The body of an enum
