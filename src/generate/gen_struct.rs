@@ -2,15 +2,15 @@ use super::{Impl, ImplFor, Parent, StreamBuilder, StringOrIdent};
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
 
-/// Builder to generate a `struct <Name> { <field>: <ty>, ... }`
-///
-/// Currently only structs with named fields are supported.
+/// Builder to generate a struct.
+/// Defaults to a struct with named fields `struct <Name> { <field>: <ty>, ... }`
 pub struct GenStruct<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,
     visibility: Visibility,
     fields: Vec<StructField>,
     additional: Vec<StreamBuilder>,
+    struct_type: StructType,
 }
 
 impl<'a, P: Parent> GenStruct<'a, P> {
@@ -21,7 +21,58 @@ impl<'a, P: Parent> GenStruct<'a, P> {
             visibility: Visibility::Default,
             fields: Vec::new(),
             additional: Vec::new(),
+            struct_type: StructType::Named,
         }
+    }
+
+    /// Make the struct a zero-sized type (no fields)
+    ///
+    /// Any fields will be ignored
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .make_zst()
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo ;");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo;
+    /// ```
+    pub fn make_zst(&mut self) -> &mut Self {
+        self.struct_type = StructType::Zst;
+        self
+    }
+
+    /// Make the struct fields unnamed
+    ///
+    /// The names of any field will be ignored
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .make_tuple()
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo (u16 , String ,) ;");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo(u16, String);
+    /// ```
+    pub fn make_tuple(&mut self) -> &mut Self {
+        self.struct_type = StructType::Unnamed;
+        self
     }
 
     /// Make the struct `pub`. By default the struct will have no visibility modifier and will only be visible in the current scope.
@@ -31,6 +82,27 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     }
 
     /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
+    ///
+    /// Names are ignored when the Struct's fields are unnamed
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("struct Foo { bar : u16 , baz : String , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo {
+    ///     bar: u16,
+    ///     baz: String,
+    /// };
+    /// ```
     pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
         self.fields.push(StructField {
             name: name.into(),
@@ -41,6 +113,8 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     }
 
     /// Add a *public* field to the struct. For adding a public field, see `add_field`
+    ///
+    /// Names are ignored when the Struct's fields are unnamed
     pub fn add_pub_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
         self.fields.push(StructField {
             name: name.into(),
@@ -94,28 +168,49 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
-        builder
-            .ident_str("struct")
-            .ident(self.name.clone())
-            .group(Delimiter::Brace, |b| {
-                for field in &self.fields {
-                    if field.vis == Visibility::Pub {
-                        b.ident_str("pub");
+        builder.ident_str("struct").ident(self.name.clone());
+
+        match self.struct_type {
+            StructType::Named => builder
+                .group(Delimiter::Brace, |b| {
+                    for field in &self.fields {
+                        if field.vis == Visibility::Pub {
+                            b.ident_str("pub");
+                        }
+                        b.ident_str(&field.name)
+                            .punct(':')
+                            .push_parsed(&field.ty)?
+                            .punct(',');
                     }
-                    b.ident_str(&field.name)
-                        .punct(':')
-                        .push_parsed(&field.ty)?
-                        .punct(',');
-                }
-                Ok(())
-            })
-            .expect("Could not build struct");
+                    Ok(())
+                })
+                .expect("Could not build struct"),
+            StructType::Unnamed => builder
+                .group(Delimiter::Parenthesis, |b| {
+                    for field in &self.fields {
+                        if field.vis == Visibility::Pub {
+                            b.ident_str("pub");
+                        }
+                        b.push_parsed(&field.ty)?.punct(',');
+                    }
+                    Ok(())
+                })
+                .expect("Could not build struct")
+                .punct(';'),
+            StructType::Zst => builder.punct(';'),
+        };
 
         for additional in std::mem::take(&mut self.additional) {
             builder.append(additional);
         }
         self.parent.append(builder);
     }
+}
+
+enum StructType {
+    Named,
+    Unnamed,
+    Zst,
 }
 
 struct StructField {
