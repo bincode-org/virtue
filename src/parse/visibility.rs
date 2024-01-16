@@ -1,5 +1,5 @@
 use super::utils::*;
-use crate::prelude::TokenTree;
+use crate::prelude::{Delimiter, TokenTree};
 use crate::Result;
 use std::iter::Peekable;
 
@@ -21,9 +21,20 @@ impl Visibility {
                 assume_ident(input.next());
 
                 // check if the next token is `pub(...)`
-                if let Some(TokenTree::Group(_)) = input.peek() {
-                    // we just consume the visibility, we're not actually using it for generation
-                    assume_group(input.next());
+                if let Some(TokenTree::Group(g)) = input.peek() {
+                    if g.delimiter() == Delimiter::Parenthesis {
+                        // check if this is one of:
+                        // - pub ( crate )
+                        // - pub ( self )
+                        // - pub ( super )
+                        // - pub ( in ... )
+                        if let Some(TokenTree::Ident(i)) = g.stream().into_iter().next() {
+                            if matches!(i.to_string().as_str(), "crate" | "self" | "super" | "in") {
+                                // it is, ignore this token
+                                assume_group(input.next());
+                            }
+                        }
+                    }
                 }
 
                 Ok(Visibility::Pub)
