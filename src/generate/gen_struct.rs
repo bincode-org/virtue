@@ -1,5 +1,5 @@
 use super::{Impl, ImplFor, Parent, StreamBuilder, StringOrIdent};
-use crate::parse::Visibility;
+use crate::parse::{Generic, Generics, Visibility};
 use crate::prelude::{Delimiter, Ident, Span};
 
 /// Builder to generate a struct.
@@ -8,6 +8,7 @@ pub struct GenStruct<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,
     visibility: Visibility,
+    generics: Option<Generics>,
     fields: Vec<StructField>,
     additional: Vec<StreamBuilder>,
     struct_type: StructType,
@@ -19,6 +20,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
             parent,
             name: Ident::new(name.into().as_str(), Span::call_site()),
             visibility: Visibility::Default,
+            generics: None,
             fields: Vec::new(),
             additional: Vec::new(),
             struct_type: StructType::Named,
@@ -78,6 +80,24 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// Make the struct `pub`. By default the struct will have no visibility modifier and will only be visible in the current scope.
     pub fn make_pub(&mut self) -> &mut Self {
         self.visibility = Visibility::Pub;
+        self
+    }
+    
+    /// Inherit the generic parameters of the parent type.
+    pub fn inherit_generics(&mut self) -> &mut Self {
+        self.generics = self.parent.generics().cloned();
+        self
+    }
+    
+    /// Append generic parameters to the type.
+    pub fn append_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
+        self.generics.get_or_insert_with(|| Generics(Vec::new())).extend(generics);
+        self
+    }
+    
+    /// Add a generic parameter to the type.
+    pub fn add_generic(&mut self, generic: Generic) -> &mut Self {
+        self.generics.get_or_insert_with(|| Generics(Vec::new())).push(generic);
         self
     }
 
@@ -153,8 +173,8 @@ impl<'a, P: Parent> Parent for GenStruct<'a, P> {
         &self.name
     }
 
-    fn generics(&self) -> Option<&crate::parse::Generics> {
-        None
+    fn generics(&self) -> Option<&Generics> {
+        self.generics.as_ref()
     }
 
     fn generic_constraints(&self) -> Option<&crate::parse::GenericConstraints> {
@@ -168,7 +188,14 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
-        builder.ident_str("struct").ident(self.name.clone());
+        builder
+            .ident_str("struct")
+            .ident(self.name.clone())
+            .append(
+                self.generics()
+                    .map(Generics::impl_generics)
+                    .unwrap_or_default()
+            );
 
         match self.struct_type {
             StructType::Named => builder
