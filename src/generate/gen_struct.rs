@@ -84,18 +84,78 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     }
     
     /// Inherit the generic parameters of the parent type.
+    /// 
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// // given a derive on struct Bar<'a>
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .inherit_generics()
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    /// 
+    /// Generates:
+    /// ```ignore
+    /// // given a derive on struct Bar<'a>
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
     pub fn inherit_generics(&mut self) -> &mut Self {
         self.generics = self.parent.generics().cloned();
         self
     }
     
     /// Append generic parameters to the type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # use virtue::parse::{Generic, Lifetime};
+    /// # use proc_macro2::{Ident, Span};
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .append_generics([Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into()])
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
     pub fn append_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
         self.generics.get_or_insert_with(|| Generics(Vec::new())).extend(generics);
         self
     }
     
     /// Add a generic parameter to the type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # use virtue::parse::{Generic, Lifetime};
+    /// # use proc_macro2::{Ident, Span};
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_generic(Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into())
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
     pub fn add_generic(&mut self, generic: Generic) -> &mut Self {
         self.generics.get_or_insert_with(|| Generics(Vec::new())).push(generic);
         self
