@@ -1,4 +1,6 @@
-use super::{Impl, ImplFor, Parent, StreamBuilder, StringOrIdent};
+use super::{
+    build_attributes, Attributes, Field, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+};
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
 use crate::Result;
@@ -43,6 +45,7 @@ pub struct GenEnum<'a, P: Parent> {
     name: Ident,
     visibility: Visibility,
     values: Vec<EnumValue>,
+    attributes: Attributes,
     additional: Vec<StreamBuilder>,
 }
 
@@ -53,6 +56,7 @@ impl<'a, P: Parent> GenEnum<'a, P> {
             name: Ident::new(name.into().as_str(), Span::call_site()),
             visibility: Visibility::Default,
             values: Vec::new(),
+            attributes: Attributes::default(),
             additional: Vec::new(),
         }
     }
@@ -61,6 +65,78 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     pub fn make_pub(&mut self) -> &mut Self {
         self.visibility = Visibility::Pub;
         self
+    }
+
+    /// Add a derive macro to the enum.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .with_derive("Clone")
+    ///     .with_derive("Default");
+    /// # generator.assert_eq("# [derive (Clone , Default)] enum Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[derive(Clone, Default)]
+    /// enum Foo { }
+    pub fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
+        self.attributes.push_derive(derive);
+        self
+    }
+
+    /// Add derive macros to the enum.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .with_derives(["Clone".into(), "Default".into()]);
+    /// # generator.assert_eq("# [derive (Clone , Default)] enum Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[derive(Clone, Default)]
+    /// enum Foo { }
+    pub fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
+        self.attributes.append_derives(derives);
+        self
+    }
+
+    /// Add an attribute to the enum. For `#[derive(...)]`, use [`with_derive`](Self::with_derive)
+    /// instead.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .with_attribute("serde", |b| {
+    ///         b.push_parsed("(untagged)")?;
+    ///         Ok(())
+    ///     })?;
+    /// # generator.assert_eq("# [serde (untagged)] enum Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[serde(untagged)]
+    /// enum Foo { }
+    /// ```
+    pub fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> Result<&mut Self>
+    where
+        T: FnOnce(&mut StreamBuilder) -> Result,
+    {
+        self.attributes.push(name.into(), value)?;
+        Ok(self)
     }
 
     /// Add an enum value
@@ -112,6 +188,7 @@ impl<'a, P: Parent> Parent for GenEnum<'a, P> {
 impl<'a, P: Parent> Drop for GenEnum<'a, P> {
     fn drop(&mut self) {
         let mut builder = StreamBuilder::new();
+        self.attributes.build(&mut builder);
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
@@ -119,7 +196,7 @@ impl<'a, P: Parent> Drop for GenEnum<'a, P> {
             .ident_str("enum")
             .ident(self.name.clone())
             .group(Delimiter::Brace, |b| {
-                for value in &self.values {
+                for value in self.values.iter_mut() {
                     build_value(b, value)?;
                 }
 
@@ -134,12 +211,15 @@ impl<'a, P: Parent> Drop for GenEnum<'a, P> {
     }
 }
 
-fn build_value(builder: &mut StreamBuilder, value: &EnumValue) -> Result {
+fn build_value(builder: &mut StreamBuilder, value: &mut EnumValue) -> Result {
+    use std::mem::take;
+    value.attributes.build(builder);
     builder.ident(value.name.clone());
 
     match value.value_type {
         ValueType::Named => builder.group(Delimiter::Brace, |b| {
-            for field in &value.fields {
+            for field in value.fields.iter_mut() {
+                build_attributes(b, take(&mut field.attributes));
                 if field.vis == Visibility::Pub {
                     b.ident_str("pub");
                 }
@@ -151,7 +231,8 @@ fn build_value(builder: &mut StreamBuilder, value: &EnumValue) -> Result {
             Ok(())
         })?,
         ValueType::Unnamed => builder.group(Delimiter::Parenthesis, |b| {
-            for field in &value.fields {
+            for field in value.fields.iter_mut() {
+                build_attributes(b, take(&mut field.attributes));
                 if field.vis == Visibility::Pub {
                     b.ident_str("pub");
                 }
@@ -169,8 +250,9 @@ fn build_value(builder: &mut StreamBuilder, value: &EnumValue) -> Result {
 
 pub struct EnumValue {
     name: Ident,
-    fields: Vec<EnumField>,
+    fields: Vec<Field>,
     value_type: ValueType,
+    attributes: Attributes,
 }
 
 impl EnumValue {
@@ -179,6 +261,7 @@ impl EnumValue {
             name: Ident::new(name.into().as_str(), Span::call_site()),
             fields: Vec::new(),
             value_type: ValueType::Named,
+            attributes: Attributes::default(),
         }
     }
 
@@ -197,36 +280,97 @@ impl EnumValue {
         self.value_type = ValueType::Unnamed;
         self
     }
+    /// Add an attribute to the variant.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .add_value("Bar")
+    ///     .with_attribute("serde", |b| {
+    ///         b.push_parsed("(rename_all = \"camelCase\")")?;
+    ///         Ok(())
+    ///     })?;
+    /// # generator.assert_eq("enum Foo { # [serde (rename_all = \"camelCase\")] Bar { } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// enum Foo {
+    ///     #[serde(rename_all = "camelCase")]
+    ///     Bar { }
+    /// }
+    /// ```
+    pub fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> Result<&mut Self>
+    where
+        T: FnOnce(&mut StreamBuilder) -> Result,
+    {
+        self.attributes.push(name.into(), value)?;
+        Ok(self)
+    }
 
     /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
     ///
     /// Names are ignored when the Struct's fields are unnamed
     pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields.push(EnumField {
-            name: name.into(),
-            vis: Visibility::Default,
-            ty: ty.into(),
-        });
+        self.fields
+            .push(Field::new(name.into(), Visibility::Default, ty.into()));
         self
+    }
+
+    /// Add a *private* field with an attribute to the variant.
+    ///
+    /// Names are ignored when the variant's fields are unnamed
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .add_value("Bar")
+    ///     .add_field_with_attribute("bar", "u16", "serde", |b| {
+    ///         b.push_parsed("(default)")?;
+    ///         Ok(())
+    ///     })?;
+    /// # generator.assert_eq("enum Foo { Bar { # [serde (default)] bar : u16 , } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// enum Foo {
+    ///     Bar {
+    ///         #[serde(default)]
+    ///         bar: u16
+    ///     }
+    /// }
+    /// ```
+    pub fn add_field_with_attribute<T>(
+        &mut self,
+        name: impl Into<String>,
+        ty: impl Into<String>,
+        attribute_name: impl Into<String>,
+        attribute_value: T,
+    ) -> Result<&mut Self>
+    where
+        T: FnOnce(&mut StreamBuilder) -> Result,
+    {
+        let field = Field::new(name, Visibility::Default, ty)
+            .with_attribute(attribute_name, attribute_value)?;
+        self.fields.push(field);
+        Ok(self)
     }
 
     /// Add a *public* field to the struct. For adding a public field, see `add_field`
     ///
     /// Names are ignored when the Struct's fields are unnamed
     pub fn add_pub_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields.push(EnumField {
-            name: name.into(),
-            vis: Visibility::Pub,
-            ty: ty.into(),
-        });
+        self.fields
+            .push(Field::new(name.into(), Visibility::Pub, ty.into()));
         self
     }
-}
-
-struct EnumField {
-    name: String,
-    vis: Visibility,
-    ty: String,
 }
 
 enum ValueType {
