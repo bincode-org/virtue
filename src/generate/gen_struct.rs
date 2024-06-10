@@ -82,9 +82,9 @@ impl<'a, P: Parent> GenStruct<'a, P> {
         self.visibility = Visibility::Pub;
         self
     }
-    
+
     /// Inherit the generic parameters of the parent type.
-    /// 
+    ///
     /// ```
     /// # use virtue::prelude::Generator;
     /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
@@ -96,7 +96,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
-    /// 
+    ///
     /// Generates:
     /// ```ignore
     /// // given a derive on struct Bar<'a>
@@ -108,7 +108,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
         self.generics = self.parent.generics().cloned();
         self
     }
-    
+
     /// Append generic parameters to the type.
     ///
     /// ```
@@ -131,10 +131,12 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// }
     /// ```
     pub fn append_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
-        self.generics.get_or_insert_with(|| Generics(Vec::new())).extend(generics);
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .extend(generics);
         self
     }
-    
+
     /// Add a generic parameter to the type.
     ///
     /// ```
@@ -157,7 +159,9 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// }
     /// ```
     pub fn add_generic(&mut self, generic: Generic) -> &mut Self {
-        self.generics.get_or_insert_with(|| Generics(Vec::new())).push(generic);
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .push(generic);
         self
     }
 
@@ -248,14 +252,11 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
-        builder
-            .ident_str("struct")
-            .ident(self.name.clone())
-            .append(
-                self.generics()
-                    .map(Generics::impl_generics)
-                    .unwrap_or_default()
-            );
+        builder.ident_str("struct").ident(self.name.clone()).append(
+            self.generics()
+                .map(Generics::impl_generics)
+                .unwrap_or_default(),
+        );
 
         match self.struct_type {
             StructType::Named => builder

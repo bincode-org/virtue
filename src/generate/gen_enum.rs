@@ -119,7 +119,9 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     /// }
     /// ```
     pub fn append_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
-        self.generics.get_or_insert_with(|| Generics(Vec::new())).extend(generics);
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .extend(generics);
         self
     }
 
@@ -147,7 +149,9 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     /// }
     /// ```
     pub fn add_generic(&mut self, generic: Generic) -> &mut Self {
-        self.generics.get_or_insert_with(|| Generics(Vec::new())).push(generic);
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .push(generic);
         self
     }
 
@@ -209,7 +213,7 @@ impl<'a, P: Parent> Drop for GenEnum<'a, P> {
             .append(
                 self.generics()
                     .map(Generics::impl_generics)
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             )
             .group(Delimiter::Brace, |b| {
                 for value in &self.values {
