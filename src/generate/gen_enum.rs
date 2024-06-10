@@ -1,5 +1,5 @@
 use super::{
-    build_attributes, Attributes, Field, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+    AttributeContainer, Field, FieldContainer, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
 };
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
@@ -45,7 +45,8 @@ pub struct GenEnum<'a, P: Parent> {
     name: Ident,
     visibility: Visibility,
     values: Vec<EnumValue>,
-    attributes: Attributes,
+    derives: Vec<StringOrIdent>,
+    attributes: Vec<(String, StreamBuilder)>,
     additional: Vec<StreamBuilder>,
 }
 
@@ -56,7 +57,8 @@ impl<'a, P: Parent> GenEnum<'a, P> {
             name: Ident::new(name.into().as_str(), Span::call_site()),
             visibility: Visibility::Default,
             values: Vec::new(),
-            attributes: Attributes::default(),
+            derives: Vec::new(),
+            attributes: Vec::new(),
             additional: Vec::new(),
         }
     }
@@ -85,8 +87,7 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     /// #[derive(Clone, Default)]
     /// enum Foo { }
     pub fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
-        self.attributes.push_derive(derive);
-        self
+        AttributeContainer::with_derive(self, derive)
     }
 
     /// Add derive macros to the enum.
@@ -106,8 +107,7 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     /// #[derive(Clone, Default)]
     /// enum Foo { }
     pub fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
-        self.attributes.append_derives(derives);
-        self
+        AttributeContainer::with_derives(self, derives)
     }
 
     /// Add an attribute to the enum. For `#[derive(...)]`, use [`with_derive`](Self::with_derive)
@@ -135,8 +135,7 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     where
         T: FnOnce(&mut StreamBuilder) -> Result,
     {
-        self.attributes.push(name.into(), value)?;
-        Ok(self)
+        AttributeContainer::with_attribute(self, name, value)
     }
 
     /// Add an enum value
@@ -167,6 +166,16 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     }
 }
 
+impl<P: Parent> AttributeContainer for GenEnum<'_, P> {
+    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+        &mut self.derives
+    }
+
+    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+        &mut self.attributes
+    }
+}
+
 impl<'a, P: Parent> Parent for GenEnum<'a, P> {
     fn append(&mut self, builder: StreamBuilder) {
         self.additional.push(builder);
@@ -188,7 +197,8 @@ impl<'a, P: Parent> Parent for GenEnum<'a, P> {
 impl<'a, P: Parent> Drop for GenEnum<'a, P> {
     fn drop(&mut self) {
         let mut builder = StreamBuilder::new();
-        self.attributes.build(&mut builder);
+        self.build_derives(&mut builder)
+            .build_attributes(&mut builder);
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
@@ -212,14 +222,13 @@ impl<'a, P: Parent> Drop for GenEnum<'a, P> {
 }
 
 fn build_value(builder: &mut StreamBuilder, value: &mut EnumValue) -> Result {
-    use std::mem::take;
-    value.attributes.build(builder);
+    value.build_attributes(builder);
     builder.ident(value.name.clone());
 
     match value.value_type {
         ValueType::Named => builder.group(Delimiter::Brace, |b| {
             for field in value.fields.iter_mut() {
-                build_attributes(b, take(&mut field.attributes));
+                field.build_attributes(b);
                 if field.vis == Visibility::Pub {
                     b.ident_str("pub");
                 }
@@ -232,7 +241,7 @@ fn build_value(builder: &mut StreamBuilder, value: &mut EnumValue) -> Result {
         })?,
         ValueType::Unnamed => builder.group(Delimiter::Parenthesis, |b| {
             for field in value.fields.iter_mut() {
-                build_attributes(b, take(&mut field.attributes));
+                field.build_attributes(b);
                 if field.vis == Visibility::Pub {
                     b.ident_str("pub");
                 }
@@ -252,7 +261,7 @@ pub struct EnumValue {
     name: Ident,
     fields: Vec<Field>,
     value_type: ValueType,
-    attributes: Attributes,
+    attributes: Vec<(String, StreamBuilder)>,
 }
 
 impl EnumValue {
@@ -261,7 +270,7 @@ impl EnumValue {
             name: Ident::new(name.into().as_str(), Span::call_site()),
             fields: Vec::new(),
             value_type: ValueType::Named,
-            attributes: Attributes::default(),
+            attributes: Vec::new(),
         }
     }
 
@@ -307,8 +316,7 @@ impl EnumValue {
     where
         T: FnOnce(&mut StreamBuilder) -> Result,
     {
-        self.attributes.push(name.into(), value)?;
-        Ok(self)
+        AttributeContainer::with_attribute(self, name, value)
     }
 
     /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
@@ -357,10 +365,14 @@ impl EnumValue {
     where
         T: FnOnce(&mut StreamBuilder) -> Result,
     {
-        let field = Field::new(name, Visibility::Default, ty)
-            .with_attribute(attribute_name, attribute_value)?;
-        self.fields.push(field);
-        Ok(self)
+        FieldContainer::add_field_with_attribute(
+            self,
+            name,
+            ty,
+            Visibility::Default,
+            attribute_name,
+            attribute_value,
+        )
     }
 
     /// Add a *public* field to the struct. For adding a public field, see `add_field`
@@ -370,6 +382,22 @@ impl EnumValue {
         self.fields
             .push(Field::new(name.into(), Visibility::Pub, ty.into()));
         self
+    }
+}
+
+impl AttributeContainer for EnumValue {
+    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+        unreachable!("enum variants cannot have derives")
+    }
+
+    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+        &mut self.attributes
+    }
+}
+
+impl FieldContainer for EnumValue {
+    fn fields(&mut self) -> &mut Vec<Field> {
+        &mut self.fields
     }
 }
 

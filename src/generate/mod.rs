@@ -97,56 +97,37 @@ impl Field {
             attributes: Vec::new(),
         }
     }
+}
 
-    fn with_attribute<F>(
-        mut self,
-        attribute_name: impl Into<String>,
-        attribute_value: F,
-    ) -> crate::Result<Self>
+/// A helper trait to share attribute code between struct and enum generators.
+trait AttributeContainer {
+    fn derives(&mut self) -> &mut Vec<StringOrIdent>;
+    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)>;
+
+    fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
+        self.derives().push(derive.into());
+        self
+    }
+
+    fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
+        self.derives().extend(derives);
+        self
+    }
+
+    fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> crate::Result<&mut Self>
     where
-        F: FnOnce(&mut StreamBuilder) -> crate::Result,
+        T: FnOnce(&mut StreamBuilder) -> crate::Result,
     {
-        let mut b = StreamBuilder::new();
-        attribute_value(&mut b)?;
-        self.attributes.push((attribute_name.into(), b));
-        Ok(self)
-    }
-}
-
-/// A set of attributes for a struct or enum.
-#[derive(Default)]
-struct Attributes {
-    derives: Vec<StringOrIdent>,
-    attributes: Vec<(String, StreamBuilder)>,
-}
-
-impl Attributes {
-    fn push_derive(&mut self, derive: impl Into<StringOrIdent>) {
-        self.derives.push(derive.into());
-    }
-
-    fn push(
-        &mut self,
-        name: impl Into<String>,
-        build: impl FnOnce(&mut StreamBuilder) -> crate::Result,
-    ) -> crate::Result {
-        self.attributes.push((name.into(), {
+        self.attributes().push((name.into(), {
             let mut b = StreamBuilder::new();
-            build(&mut b)?;
+            value(&mut b)?;
             b
         }));
-        Ok(())
+        Ok(self)
     }
 
-    fn append_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) {
-        self.derives.extend(derives);
-    }
-
-    fn build(&mut self, b: &mut StreamBuilder) {
-        let Self {
-            derives,
-            attributes,
-        } = std::mem::take(self);
+    fn build_derives(&mut self, b: &mut StreamBuilder) -> &mut Self {
+        let derives = std::mem::take(self.derives());
         if !derives.is_empty() {
             build_attribute(b, "derive", |b| {
                 b.group(Delimiter::Parenthesis, |b| {
@@ -164,15 +145,47 @@ impl Attributes {
             })
             .expect("could not build derives");
         }
+        self
+    }
 
-        build_attributes(b, attributes);
+    fn build_attributes(&mut self, b: &mut StreamBuilder) -> &mut Self {
+        for (name, value) in std::mem::take(self.attributes()) {
+            build_attribute(b, name, |b| Ok(b.extend(value.stream)))
+                .expect("could not build attribute");
+        }
+        self
     }
 }
 
-fn build_attributes(b: &mut StreamBuilder, attributes: Vec<(String, StreamBuilder)>) {
-    for (name, value) in attributes {
-        build_attribute(b, name, |b| Ok(b.extend(value.stream)))
-            .expect("could not build attribute");
+impl AttributeContainer for Field {
+    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+        unreachable!("fields cannot have derives")
+    }
+
+    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+        &mut self.attributes
+    }
+}
+
+/// A helper trait to share field attribute code between struct and enum generators.
+trait FieldContainer {
+    fn fields(&mut self) -> &mut Vec<Field>;
+
+    fn add_field_with_attribute<T>(
+        &mut self,
+        name: impl Into<String>,
+        ty: impl Into<String>,
+        vis: Visibility,
+        attribute_name: impl Into<String>,
+        attribute_value: T,
+    ) -> crate::Result<&mut Self>
+    where
+        T: FnOnce(&mut StreamBuilder) -> crate::Result,
+    {
+        let mut field = Field::new(name, vis, ty);
+        field.with_attribute(attribute_name, attribute_value)?;
+        self.fields().push(field);
+        Ok(self)
     }
 }
 

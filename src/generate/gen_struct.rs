@@ -1,5 +1,5 @@
 use super::{
-    build_attributes, Attributes, Field, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+    AttributeContainer, Field, FieldContainer, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
 };
 use crate::parse::Visibility;
 use crate::prelude::{Delimiter, Ident, Span};
@@ -11,7 +11,8 @@ pub struct GenStruct<'a, P: Parent> {
     name: Ident,
     visibility: Visibility,
     fields: Vec<Field>,
-    attributes: Attributes,
+    derives: Vec<StringOrIdent>,
+    attributes: Vec<(String, StreamBuilder)>,
     additional: Vec<StreamBuilder>,
     struct_type: StructType,
 }
@@ -23,7 +24,8 @@ impl<'a, P: Parent> GenStruct<'a, P> {
             name: Ident::new(name.into().as_str(), Span::call_site()),
             visibility: Visibility::Default,
             fields: Vec::new(),
-            attributes: Attributes::default(),
+            derives: Vec::new(),
+            attributes: Vec::new(),
             additional: Vec::new(),
             struct_type: StructType::Named,
         }
@@ -103,8 +105,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// #[derive(Clone, Default)]
     /// struct Foo { }
     pub fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
-        self.attributes.push_derive(derive);
-        self
+        AttributeContainer::with_derive(self, derive)
     }
 
     /// Add derive macros to the struct.
@@ -124,8 +125,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// #[derive(Clone, Default)]
     /// struct Foo { }
     pub fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
-        self.attributes.append_derives(derives);
-        self
+        AttributeContainer::with_derives(self, derives)
     }
 
     /// Add an attribute to the struct. For `#[derive(...)]`, use [`with_derive`](Self::with_derive)
@@ -157,8 +157,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     where
         T: FnOnce(&mut StreamBuilder) -> crate::Result,
     {
-        self.attributes.push(name.into(), value)?;
-        Ok(self)
+        AttributeContainer::with_attribute(self, name, value)
     }
 
     /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
@@ -222,10 +221,14 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     where
         T: FnOnce(&mut StreamBuilder) -> crate::Result,
     {
-        let field = Field::new(name, Visibility::Default, ty)
-            .with_attribute(attribute_name, attribute_value)?;
-        self.fields.push(field);
-        Ok(self)
+        FieldContainer::add_field_with_attribute(
+            self,
+            name,
+            ty,
+            Visibility::Default,
+            attribute_name,
+            attribute_value,
+        )
     }
 
     /// Add a *public* field to the struct. For adding a private field, see `add_field`
@@ -270,10 +273,14 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     where
         T: FnOnce(&mut StreamBuilder) -> crate::Result,
     {
-        let field = Field::new(name, Visibility::Pub, ty)
-            .with_attribute(attribute_name, attribute_value)?;
-        self.fields.push(field);
-        Ok(self)
+        FieldContainer::add_field_with_attribute(
+            self,
+            name,
+            ty,
+            Visibility::Pub,
+            attribute_name,
+            attribute_value,
+        )
     }
 
     /// Add an `impl <name> for <struct>`
@@ -293,6 +300,22 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// [`impl`]: #method.impl
     pub fn generate_impl(&mut self) -> Impl<Self> {
         Impl::with_parent_name(self)
+    }
+}
+
+impl<P: Parent> AttributeContainer for GenStruct<'_, P> {
+    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+        &mut self.derives
+    }
+
+    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+        &mut self.attributes
+    }
+}
+
+impl<P: Parent> FieldContainer for GenStruct<'_, P> {
+    fn fields(&mut self) -> &mut Vec<Field> {
+        &mut self.fields
     }
 }
 
@@ -319,7 +342,8 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
         use std::mem::take;
         let mut builder = StreamBuilder::new();
 
-        self.attributes.build(&mut builder);
+        self.build_derives(&mut builder)
+            .build_attributes(&mut builder);
 
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
@@ -330,7 +354,7 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
             StructType::Named => builder
                 .group(Delimiter::Brace, |b| {
                     for field in self.fields.iter_mut() {
-                        build_attributes(b, take(&mut field.attributes));
+                        field.build_attributes(b);
                         if field.vis == Visibility::Pub {
                             b.ident_str("pub");
                         }
@@ -345,7 +369,7 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
             StructType::Unnamed => builder
                 .group(Delimiter::Parenthesis, |b| {
                     for field in self.fields.iter_mut() {
-                        build_attributes(b, take(&mut field.attributes));
+                        field.build_attributes(b);
                         if field.vis == Visibility::Pub {
                             b.ident_str("pub");
                         }
