@@ -118,7 +118,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
     /// generator
     ///     .generate_struct("Foo")
-    ///     .append_generics([Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into()])
+    ///     .with_generics([Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into()])
     ///     .add_field("bar", "&'a str");
     /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
     /// # Ok::<_, virtue::Error>(())
@@ -130,7 +130,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     ///     bar: &'a str
     /// }
     /// ```
-    pub fn append_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
+    pub fn with_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
         self.generics
             .get_or_insert_with(|| Generics(Vec::new()))
             .extend(generics);
@@ -146,7 +146,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
     /// generator
     ///     .generate_struct("Foo")
-    ///     .add_generic(Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into())
+    ///     .with_generic(Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into())
     ///     .add_field("bar", "&'a str");
     /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
     /// # Ok::<_, virtue::Error>(())
@@ -158,7 +158,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     ///     bar: &'a str
     /// }
     /// ```
-    pub fn add_generic(&mut self, generic: Generic) -> &mut Self {
+    pub fn with_generic(&mut self, generic: Generic) -> &mut Self {
         self.generics
             .get_or_insert_with(|| Generics(Vec::new()))
             .push(generic);
