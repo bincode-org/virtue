@@ -1,5 +1,5 @@
 use super::{
-    AttributeContainer, Field, FieldContainer, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+    AttributeContainer, Field, FieldBuilder, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
 };
 use crate::parse::{Generic, Generics, Visibility};
 use crate::prelude::{Delimiter, Ident, Span};
@@ -21,9 +21,9 @@ use crate::Result;
 ///         .add_field("baz", "String");
 ///     enumgen
 ///         .add_value("Unnamed")
+///         .make_tuple()
 ///         .add_field("", "u16")
-///         .add_field("baz", "String")
-///         .make_tuple();
+///         .add_field("baz", "String");
 /// }
 /// # generator.assert_eq("enum Foo { ZST , Named { bar : u16 , baz : String , } , Unnamed (u16 , String ,) , }");
 /// # Ok::<_, virtue::Error>(())
@@ -47,7 +47,7 @@ pub struct GenEnum<'a, P: Parent> {
     generics: Option<Generics>,
     values: Vec<EnumValue>,
     derives: Vec<StringOrIdent>,
-    attributes: Vec<(String, StreamBuilder)>,
+    attributes: Vec<StreamBuilder>,
     additional: Vec<StreamBuilder>,
 }
 
@@ -133,10 +133,11 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     /// #[serde(untagged)]
     /// enum Foo { }
     /// ```
-    pub fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> Result,
-    {
+    pub fn with_attribute(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl FnOnce(&mut StreamBuilder) -> Result,
+    ) -> Result<&mut Self> {
         AttributeContainer::with_attribute(self, name, value)
     }
 
@@ -263,7 +264,7 @@ impl<P: Parent> AttributeContainer for GenEnum<'_, P> {
         &mut self.derives
     }
 
-    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+    fn attributes(&mut self) -> &mut Vec<StreamBuilder> {
         &mut self.attributes
     }
 }
@@ -358,7 +359,7 @@ pub struct EnumValue {
     name: Ident,
     fields: Vec<Field>,
     value_type: ValueType,
-    attributes: Vec<(String, StreamBuilder)>,
+    attributes: Vec<StreamBuilder>,
 }
 
 impl EnumValue {
@@ -386,6 +387,7 @@ impl EnumValue {
         self.value_type = ValueType::Unnamed;
         self
     }
+
     /// Add an attribute to the variant.
     ///
     /// ```
@@ -409,25 +411,15 @@ impl EnumValue {
     ///     Bar { }
     /// }
     /// ```
-    pub fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> Result,
-    {
+    pub fn with_attribute(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl FnOnce(&mut StreamBuilder) -> Result,
+    ) -> Result<&mut Self> {
         AttributeContainer::with_attribute(self, name, value)
     }
 
-    /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
-    ///
-    /// Names are ignored when the Struct's fields are unnamed
-    pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields
-            .push(Field::new(name.into(), Visibility::Default, ty.into()));
-        self
-    }
-
-    /// Add a *private* field with an attribute to the variant.
-    ///
-    /// Names are ignored when the variant's fields are unnamed
+    /// Add a parsed attribute to the variant.
     ///
     /// ```
     /// # use virtue::prelude::Generator;
@@ -435,50 +427,55 @@ impl EnumValue {
     /// generator
     ///     .generate_enum("Foo")
     ///     .add_value("Bar")
-    ///     .add_field_with_attribute("bar", "u16", "serde", |b| {
-    ///         b.push_parsed("(default)")?;
-    ///         Ok(())
-    ///     })?;
-    /// # generator.assert_eq("enum Foo { Bar { # [serde (default)] bar : u16 , } , }");
+    ///     .with_parsed_attribute("serde(rename_all = \"camelCase\")")?;
+    /// # generator.assert_eq("enum Foo { # [serde (rename_all = \"camelCase\")] Bar { } , }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
     ///
     /// Generates:
     /// ```ignore
     /// enum Foo {
-    ///     Bar {
-    ///         #[serde(default)]
-    ///         bar: u16
-    ///     }
+    ///     #[serde(rename_all = "camelCase")]
+    ///     Bar { }
     /// }
     /// ```
-    pub fn add_field_with_attribute<T>(
+    pub fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> Result<&mut Self> {
+        AttributeContainer::with_parsed_attribute(self, attribute)
+    }
+
+    /// Add a field to the enum value.
+    ///
+    /// Names are ignored when the enum value's fields are unnamed
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .add_value("Bar")
+    ///     .add_field("bar", "u16")
+    ///     .add_field("baz", "String");
+    /// # generator.assert_eq("enum Foo { Bar { bar : u16 , baz : String , } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// enum Foo {
+    ///     Bar {
+    ///         bar: u16,
+    ///         baz: String
+    ///     }
+    /// };
+    /// ```
+    pub fn add_field(
         &mut self,
         name: impl Into<String>,
         ty: impl Into<String>,
-        attribute_name: impl Into<String>,
-        attribute_value: T,
-    ) -> Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> Result,
-    {
-        FieldContainer::add_field_with_attribute(
-            self,
-            name,
-            ty,
-            Visibility::Default,
-            attribute_name,
-            attribute_value,
-        )
-    }
-
-    /// Add a *public* field to the struct. For adding a public field, see `add_field`
-    ///
-    /// Names are ignored when the Struct's fields are unnamed
-    pub fn add_pub_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields
-            .push(Field::new(name.into(), Visibility::Pub, ty.into()));
-        self
+    ) -> FieldBuilder<Self> {
+        let mut fields = FieldBuilder::from(&mut self.fields);
+        fields.add_field(name, ty);
+        fields
     }
 }
 
@@ -487,14 +484,8 @@ impl AttributeContainer for EnumValue {
         unreachable!("enum variants cannot have derives")
     }
 
-    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+    fn attributes(&mut self) -> &mut Vec<StreamBuilder> {
         &mut self.attributes
-    }
-}
-
-impl FieldContainer for EnumValue {
-    fn fields(&mut self) -> &mut Vec<Field> {
-        &mut self.fields
     }
 }
 

@@ -27,6 +27,7 @@ use crate::{
     prelude::{Delimiter, Ident},
 };
 use std::fmt;
+use std::marker::PhantomData;
 
 pub use self::gen_enum::GenEnum;
 pub use self::gen_struct::GenStruct;
@@ -81,11 +82,11 @@ impl<'a> From<&'a str> for StringOrIdent {
 }
 
 /// A struct or enum variant field.
-pub struct Field {
+struct Field {
     name: String,
     vis: Visibility,
     ty: String,
-    attributes: Vec<(String, StreamBuilder)>,
+    attributes: Vec<StreamBuilder>,
 }
 
 impl Field {
@@ -99,10 +100,159 @@ impl Field {
     }
 }
 
+/// A builder for struct or enum variant fields.
+pub struct FieldBuilder<'a, P> {
+    fields: &'a mut Vec<Field>,
+    _parent: PhantomData<P>, // Keep this to disallow `pub` on enum fields
+}
+
+impl<P> FieldBuilder<'_, P> {
+    /// Add an attribute to the field.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("foo", "u16")
+    ///     .make_pub()
+    ///     .with_attribute("serde", |b| {
+    ///         b.push_parsed("(default)")?;
+    ///         Ok(())
+    ///     })?;
+    /// generator
+    ///     .generate_enum("Bar")
+    ///     .add_value("Baz")
+    ///     .add_field("baz", "bool")
+    ///     .with_attribute("serde", |b| {
+    ///         b.push_parsed("(default)")?;
+    ///         Ok(())
+    ///     })?;
+    /// # generator.assert_eq("struct Foo { # [serde (default)] pub foo : u16 , } \
+    /// enum Bar { Baz { # [serde (default)] baz : bool , } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo {
+    ///     #[serde(default)]
+    ///     pub bar: u16
+    /// }
+    ///
+    /// enum Bar {
+    ///     Baz {
+    ///         #[serde(default)]
+    ///         baz: bool
+    ///     }
+    /// }
+    /// ```
+    pub fn with_attribute(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl FnOnce(&mut StreamBuilder) -> crate::Result,
+    ) -> crate::Result<&mut Self> {
+        self.current().with_attribute(name, value)?;
+        Ok(self)
+    }
+
+    /// Add a parsed attribute to the field.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("foo", "u16")
+    ///     .make_pub()
+    ///     .with_parsed_attribute("serde(default)")?;
+    /// generator
+    ///     .generate_enum("Bar")
+    ///     .add_value("Baz")
+    ///     .add_field("baz", "bool")
+    ///     .with_parsed_attribute("serde(default)")?;
+    /// # generator.assert_eq("struct Foo { # [serde (default)] pub foo : u16 , } \
+    /// enum Bar { Baz { # [serde (default)] baz : bool , } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo {
+    ///     #[serde(default)]
+    ///     pub bar: u16
+    /// }
+    ///
+    /// enum Bar {
+    ///     Baz {
+    ///         #[serde(default)]
+    ///         baz: bool
+    ///     }
+    /// }
+    /// ```
+    pub fn with_parsed_attribute(
+        &mut self,
+        attribute: impl AsRef<str>,
+    ) -> crate::Result<&mut Self> {
+        self.current().with_parsed_attribute(attribute)?;
+        Ok(self)
+    }
+
+    /// Add a field to the parent type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("foo", "u16")
+    ///     .add_field("bar", "bool");
+    /// # generator.assert_eq("struct Foo { foo : u16 , bar : bool , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```
+    /// struct Foo {
+    ///     foo: u16,
+    ///     bar: bool
+    /// }
+    /// ```
+    pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
+        self.fields.push(Field::new(name, Visibility::Default, ty));
+        self
+    }
+}
+
+// Only allow `pub` on struct fields
+impl<'a, P: Parent> FieldBuilder<'_, GenStruct<'a, P>> {
+    /// Make the field public.
+    pub fn make_pub(&mut self) -> &mut Self {
+        self.current().vis = Visibility::Pub;
+        self
+    }
+}
+
+impl<'a, P> From<&'a mut Vec<Field>> for FieldBuilder<'a, P> {
+    fn from(fields: &'a mut Vec<Field>) -> Self {
+        Self {
+            fields,
+            _parent: PhantomData,
+        }
+    }
+}
+
+impl<P> FieldBuilder<'_, P> {
+    fn current(&mut self) -> &mut Field {
+        // A field is always added before this is called, so the unwrap doesn't fail.
+        self.fields.last_mut().unwrap()
+    }
+}
+
 /// A helper trait to share attribute code between struct and enum generators.
 trait AttributeContainer {
     fn derives(&mut self) -> &mut Vec<StringOrIdent>;
-    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)>;
+    fn attributes(&mut self) -> &mut Vec<StreamBuilder>;
 
     fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
         self.derives().push(derive.into());
@@ -114,23 +264,29 @@ trait AttributeContainer {
         self
     }
 
-    fn with_attribute<T>(&mut self, name: impl Into<String>, value: T) -> crate::Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> crate::Result,
-    {
-        self.attributes().push((name.into(), {
-            let mut b = StreamBuilder::new();
-            value(&mut b)?;
-            b
-        }));
+    fn with_attribute(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl FnOnce(&mut StreamBuilder) -> crate::Result,
+    ) -> crate::Result<&mut Self> {
+        let mut stream = StreamBuilder::new();
+        value(stream.ident_str(name))?;
+        self.attributes().push(stream);
+        Ok(self)
+    }
+
+    fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> crate::Result<&mut Self> {
+        let mut stream = StreamBuilder::new();
+        stream.push_parsed(attribute)?;
+        self.attributes().push(stream);
         Ok(self)
     }
 
     fn build_derives(&mut self, b: &mut StreamBuilder) -> &mut Self {
         let derives = std::mem::take(self.derives());
         if !derives.is_empty() {
-            build_attribute(b, "derive", |b| {
-                b.group(Delimiter::Parenthesis, |b| {
+            build_attribute(b, |b| {
+                b.ident_str("derive").group(Delimiter::Parenthesis, |b| {
                     for (idx, derive) in derives.into_iter().enumerate() {
                         if idx > 0 {
                             b.punct(',');
@@ -149,9 +305,8 @@ trait AttributeContainer {
     }
 
     fn build_attributes(&mut self, b: &mut StreamBuilder) -> &mut Self {
-        for (name, value) in std::mem::take(self.attributes()) {
-            build_attribute(b, name, |b| Ok(b.extend(value.stream)))
-                .expect("could not build attribute");
+        for attr in std::mem::take(self.attributes()) {
+            build_attribute(b, |b| Ok(b.extend(attr.stream))).expect("could not build attribute");
         }
         self
     }
@@ -162,39 +317,17 @@ impl AttributeContainer for Field {
         unreachable!("fields cannot have derives")
     }
 
-    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+    fn attributes(&mut self) -> &mut Vec<StreamBuilder> {
         &mut self.attributes
     }
 }
 
-/// A helper trait to share field attribute code between struct and enum generators.
-trait FieldContainer {
-    fn fields(&mut self) -> &mut Vec<Field>;
-
-    fn add_field_with_attribute<T>(
-        &mut self,
-        name: impl Into<String>,
-        ty: impl Into<String>,
-        vis: Visibility,
-        attribute_name: impl Into<String>,
-        attribute_value: T,
-    ) -> crate::Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> crate::Result,
-    {
-        let mut field = Field::new(name, vis, ty);
-        field.with_attribute(attribute_name, attribute_value)?;
-        self.fields().push(field);
-        Ok(self)
-    }
-}
-
-fn build_attribute<T>(b: &mut StreamBuilder, name: impl AsRef<str>, build: T) -> crate::Result
+fn build_attribute<T>(b: &mut StreamBuilder, build: T) -> crate::Result
 where
     T: FnOnce(&mut StreamBuilder) -> crate::Result<&mut StreamBuilder>,
 {
     b.punct('#').group(Delimiter::Bracket, |b| {
-        build(b.ident_str(name))?;
+        build(b)?;
         Ok(())
     })?;
 

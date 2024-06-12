@@ -1,8 +1,9 @@
 use super::{
-    AttributeContainer, Field, FieldContainer, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+    AttributeContainer, Field, FieldBuilder, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
 };
 use crate::parse::{Generic, Generics, Visibility};
 use crate::prelude::{Delimiter, Ident, Span};
+use crate::Result;
 
 /// Builder to generate a struct.
 /// Defaults to a struct with named fields `struct <Name> { <field>: <ty>, ... }`
@@ -13,7 +14,7 @@ pub struct GenStruct<'a, P: Parent> {
     generics: Option<Generics>,
     fields: Vec<Field>,
     derives: Vec<StringOrIdent>,
-    attributes: Vec<(String, StreamBuilder)>,
+    attributes: Vec<StreamBuilder>,
     additional: Vec<StreamBuilder>,
     struct_type: StructType,
 }
@@ -233,18 +234,37 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// #[serde(rename_all = "camelCase")]
     /// struct Foo { }
     /// ```
-    pub fn with_attribute<T>(
+    pub fn with_attribute(
         &mut self,
-        name: impl Into<String>,
-        value: T,
-    ) -> crate::Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> crate::Result,
-    {
+        name: impl AsRef<str>,
+        value: impl FnOnce(&mut StreamBuilder) -> Result,
+    ) -> Result<&mut Self> {
         AttributeContainer::with_attribute(self, name, value)
     }
 
-    /// Add a *private* field to the struct. For adding a public field, see `add_pub_field`
+    /// Add a parsed attribute to the struct. For `#[derive(...)]`, use [`with_derive`](Self::with_derive)
+    /// instead.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .with_parsed_attribute("serde(rename_all = \"camelCase\")")?;
+    /// # generator.assert_eq("# [serde (rename_all = \"camelCase\")] struct Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[serde(rename_all = "camelCase")]
+    /// struct Foo { }
+    /// ```
+    pub fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> Result<&mut Self> {
+        AttributeContainer::with_parsed_attribute(self, attribute)
+    }
+
+    /// Add a field to the struct.
     ///
     /// Names are ignored when the Struct's fields are unnamed
     ///
@@ -266,105 +286,14 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     ///     baz: String,
     /// };
     /// ```
-    pub fn add_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields.push(Field::new(name, Visibility::Default, ty));
-        self
-    }
-
-    /// Add a *private* field with an attribute to the struct. For adding a public field, see `add_pub_field_with_attribute`
-    ///
-    /// Names are ignored when the Struct's fields are unnamed
-    ///
-    /// ```
-    /// # use virtue::prelude::Generator;
-    /// # let mut generator = Generator::with_name("Bar");
-    /// generator
-    ///     .generate_struct("Foo")
-    ///     .add_field_with_attribute("bar", "u16", "serde", |b| {
-    ///         b.push_parsed("(default)")?;
-    ///         Ok(())
-    ///     })?;
-    /// # generator.assert_eq("struct Foo { # [serde (default)] bar : u16 , }");
-    /// # Ok::<_, virtue::Error>(())
-    /// ```
-    ///
-    /// Generates:
-    /// ```ignore
-    /// struct Foo {
-    ///     #[serde(default)]
-    ///     bar: u16
-    /// }
-    /// ```
-    pub fn add_field_with_attribute<T>(
+    pub fn add_field(
         &mut self,
         name: impl Into<String>,
         ty: impl Into<String>,
-        attribute_name: impl Into<String>,
-        attribute_value: T,
-    ) -> crate::Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> crate::Result,
-    {
-        FieldContainer::add_field_with_attribute(
-            self,
-            name,
-            ty,
-            Visibility::Default,
-            attribute_name,
-            attribute_value,
-        )
-    }
-
-    /// Add a *public* field to the struct. For adding a private field, see `add_field`
-    ///
-    /// Names are ignored when the Struct's fields are unnamed
-    pub fn add_pub_field(&mut self, name: impl Into<String>, ty: impl Into<String>) -> &mut Self {
-        self.fields.push(Field::new(name, Visibility::Pub, ty));
-        self
-    }
-
-    /// Add a *public* field with an attribute to the struct. For adding a private field, see `add_field_with_attribute`
-    ///
-    /// Names are ignored when the Struct's fields are unnamed
-    ///
-    /// ```
-    /// # use virtue::prelude::Generator;
-    /// # let mut generator = Generator::with_name("Bar");
-    /// generator
-    ///     .generate_struct("Foo")
-    ///     .add_pub_field_with_attribute("bar", "u16", "serde", |b| {
-    ///         b.push_parsed("(default)")?;
-    ///         Ok(())
-    ///     })?;
-    /// # generator.assert_eq("struct Foo { # [serde (default)] pub bar : u16 , }");
-    /// # Ok::<_, virtue::Error>(())
-    /// ```
-    ///
-    /// Generates:
-    /// ```ignore
-    /// struct Foo {
-    ///     #[serde(default)]
-    ///     pub bar: u16
-    /// }
-    /// ```
-    pub fn add_pub_field_with_attribute<T>(
-        &mut self,
-        name: impl Into<String>,
-        ty: impl Into<String>,
-        attribute_name: impl Into<String>,
-        attribute_value: T,
-    ) -> crate::Result<&mut Self>
-    where
-        T: FnOnce(&mut StreamBuilder) -> crate::Result,
-    {
-        FieldContainer::add_field_with_attribute(
-            self,
-            name,
-            ty,
-            Visibility::Pub,
-            attribute_name,
-            attribute_value,
-        )
+    ) -> FieldBuilder<Self> {
+        let mut fields = FieldBuilder::from(&mut self.fields);
+        fields.add_field(name, ty);
+        fields
     }
 
     /// Add an `impl <name> for <struct>`
@@ -392,14 +321,8 @@ impl<P: Parent> AttributeContainer for GenStruct<'_, P> {
         &mut self.derives
     }
 
-    fn attributes(&mut self) -> &mut Vec<(String, StreamBuilder)> {
+    fn attributes(&mut self) -> &mut Vec<StreamBuilder> {
         &mut self.attributes
-    }
-}
-
-impl<P: Parent> FieldContainer for GenStruct<'_, P> {
-    fn fields(&mut self) -> &mut Vec<Field> {
-        &mut self.fields
     }
 }
 
