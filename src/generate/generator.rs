@@ -179,7 +179,7 @@ impl Generator {
                     }
                 }
                 if let Some(parent) = path.parent() {
-                    path = parent.to_owned();
+                    path = parent.into();
                 } else {
                     break;
                 }

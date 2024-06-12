@@ -1,7 +1,7 @@
 use super::{
     AttributeContainer, Field, FieldContainer, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
 };
-use crate::parse::Visibility;
+use crate::parse::{Generic, Generics, Visibility};
 use crate::prelude::{Delimiter, Ident, Span};
 
 /// Builder to generate a struct.
@@ -10,6 +10,7 @@ pub struct GenStruct<'a, P: Parent> {
     parent: &'a mut P,
     name: Ident,
     visibility: Visibility,
+    generics: Option<Generics>,
     fields: Vec<Field>,
     derives: Vec<StringOrIdent>,
     attributes: Vec<(String, StreamBuilder)>,
@@ -23,6 +24,7 @@ impl<'a, P: Parent> GenStruct<'a, P> {
             parent,
             name: Ident::new(name.into().as_str(), Span::call_site()),
             visibility: Visibility::Default,
+            generics: None,
             fields: Vec::new(),
             derives: Vec::new(),
             attributes: Vec::new(),
@@ -84,6 +86,88 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// Make the struct `pub`. By default the struct will have no visibility modifier and will only be visible in the current scope.
     pub fn make_pub(&mut self) -> &mut Self {
         self.visibility = Visibility::Pub;
+        self
+    }
+
+    /// Inherit the generic parameters of the parent type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// // given a derive on struct Bar<'a>
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .inherit_generics()
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// // given a derive on struct Bar<'a>
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
+    pub fn inherit_generics(&mut self) -> &mut Self {
+        self.generics = self.parent.generics().cloned();
+        self
+    }
+
+    /// Append generic parameters to the type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # use virtue::parse::{Generic, Lifetime};
+    /// # use proc_macro2::{Ident, Span};
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .with_generics([Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into()])
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
+    pub fn with_generics(&mut self, generics: impl IntoIterator<Item = Generic>) -> &mut Self {
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .extend(generics);
+        self
+    }
+
+    /// Add a generic parameter to the type.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # use virtue::parse::{Generic, Lifetime};
+    /// # use proc_macro2::{Ident, Span};
+    /// # let mut generator = Generator::with_name("Bar").with_lifetime("a");
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .with_generic(Lifetime { ident: Ident::new("a", Span::call_site()), constraint: vec![] }.into())
+    ///     .add_field("bar", "&'a str");
+    /// # generator.assert_eq("struct Foo < 'a > { bar : &'a str , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo<'a> {
+    ///     bar: &'a str
+    /// }
+    /// ```
+    pub fn with_generic(&mut self, generic: Generic) -> &mut Self {
+        self.generics
+            .get_or_insert_with(|| Generics(Vec::new()))
+            .push(generic);
         self
     }
 
@@ -328,8 +412,8 @@ impl<'a, P: Parent> Parent for GenStruct<'a, P> {
         &self.name
     }
 
-    fn generics(&self) -> Option<&crate::parse::Generics> {
-        None
+    fn generics(&self) -> Option<&Generics> {
+        self.generics.as_ref()
     }
 
     fn generic_constraints(&self) -> Option<&crate::parse::GenericConstraints> {
@@ -348,7 +432,11 @@ impl<'a, P: Parent> Drop for GenStruct<'a, P> {
         if self.visibility == Visibility::Pub {
             builder.ident_str("pub");
         }
-        builder.ident_str("struct").ident(self.name.clone());
+        builder.ident_str("struct").ident(self.name.clone()).append(
+            self.generics()
+                .map(Generics::impl_generics)
+                .unwrap_or_default(),
+        );
 
         match self.struct_type {
             StructType::Named => builder
