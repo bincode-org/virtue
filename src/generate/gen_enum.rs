@@ -1,5 +1,6 @@
 use super::{
-    AttributeContainer, Field, FieldBuilder, Impl, ImplFor, Parent, StreamBuilder, StringOrIdent,
+    AttributeContainer, Field, FieldBuilder, Impl, ImplFor, Parent, Path, StreamBuilder,
+    StringOrIdent,
 };
 use crate::parse::{Generic, Generics, Visibility};
 use crate::prelude::{Delimiter, Ident, Span};
@@ -46,7 +47,7 @@ pub struct GenEnum<'a, P: Parent> {
     visibility: Visibility,
     generics: Option<Generics>,
     values: Vec<EnumValue>,
-    derives: Vec<StringOrIdent>,
+    derives: Vec<Path>,
     attributes: Vec<StreamBuilder>,
     additional: Vec<StreamBuilder>,
 }
@@ -75,20 +76,22 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     ///
     /// ```
     /// # use virtue::prelude::Generator;
+    /// # use virtue::generate::Path;
     /// # let mut generator = Generator::with_name("Bar");
     /// generator
     ///     .generate_enum("Foo")
     ///     .with_derive("Clone")
-    ///     .with_derive("Default");
-    /// # generator.assert_eq("# [derive (Clone , Default)] enum Foo { }");
+    ///     .with_derive("Default")
+    ///     .with_derive(Path::from_iter(vec!["serde", "Deserialize"]));
+    /// # generator.assert_eq("# [derive (Clone , Default , serde ::Deserialize)] enum Foo { }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
     ///
     /// Generates:
     /// ```ignore
-    /// #[derive(Clone, Default)]
+    /// #[derive(Clone, Default, serde::Deserialize)]
     /// enum Foo { }
-    pub fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
+    pub fn with_derive(&mut self, derive: impl Into<Path>) -> &mut Self {
         AttributeContainer::with_derive(self, derive)
     }
 
@@ -96,19 +99,27 @@ impl<'a, P: Parent> GenEnum<'a, P> {
     ///
     /// ```
     /// # use virtue::prelude::Generator;
+    /// # use virtue::generate::Path;
     /// # let mut generator = Generator::with_name("Bar");
     /// generator
     ///     .generate_enum("Foo")
-    ///     .with_derives(["Clone".into(), "Default".into()]);
-    /// # generator.assert_eq("# [derive (Clone , Default)] enum Foo { }");
+    ///     .with_derives([
+    ///         "Clone".into(),
+    ///         "Default".into(),
+    ///         Path::from_iter(vec!["serde", "Deserialize"]),
+    ///     ]);
+    /// # generator.assert_eq("# [derive (Clone , Default , serde ::Deserialize)] enum Foo { }");
     /// # Ok::<_, virtue::Error>(())
     /// ```
     ///
     /// Generates:
     /// ```ignore
-    /// #[derive(Clone, Default)]
+    /// #[derive(Clone, Default, serde::Deserialize)]
     /// enum Foo { }
-    pub fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
+    pub fn with_derives<T: Into<Path>>(
+        &mut self,
+        derives: impl IntoIterator<Item = T>,
+    ) -> &mut Self {
         AttributeContainer::with_derives(self, derives)
     }
 
@@ -260,7 +271,7 @@ impl<'a, P: Parent> GenEnum<'a, P> {
 }
 
 impl<P: Parent> AttributeContainer for GenEnum<'_, P> {
-    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+    fn derives(&mut self) -> &mut Vec<Path> {
         &mut self.derives
     }
 
@@ -480,7 +491,7 @@ impl EnumValue {
 }
 
 impl AttributeContainer for EnumValue {
-    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+    fn derives(&mut self) -> &mut Vec<Path> {
         unreachable!("enum variants cannot have derives")
     }
 

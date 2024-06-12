@@ -81,6 +81,66 @@ impl<'a> From<&'a str> for StringOrIdent {
     }
 }
 
+/// A path of identifiers, like `mod::Type`.
+pub struct Path(Vec<StringOrIdent>);
+
+impl From<String> for Path {
+    fn from(s: String) -> Self {
+        StringOrIdent::from(s).into()
+    }
+}
+
+impl From<Ident> for Path {
+    fn from(i: Ident) -> Self {
+        StringOrIdent::from(i).into()
+    }
+}
+
+impl From<&str> for Path {
+    fn from(s: &str) -> Self {
+        StringOrIdent::from(s).into()
+    }
+}
+
+impl From<StringOrIdent> for Path {
+    fn from(value: StringOrIdent) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl FromIterator<String> for Path {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        iter.into_iter().map(StringOrIdent::from).collect()
+    }
+}
+
+impl FromIterator<Ident> for Path {
+    fn from_iter<T: IntoIterator<Item = Ident>>(iter: T) -> Self {
+        iter.into_iter().map(StringOrIdent::from).collect()
+    }
+}
+
+impl<'a> FromIterator<&'a str> for Path {
+    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        iter.into_iter().map(StringOrIdent::from).collect()
+    }
+}
+
+impl FromIterator<StringOrIdent> for Path {
+    fn from_iter<T: IntoIterator<Item = StringOrIdent>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl IntoIterator for Path {
+    type Item = StringOrIdent;
+    type IntoIter = std::vec::IntoIter<StringOrIdent>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 /// A struct or enum variant field.
 struct Field {
     name: String,
@@ -251,16 +311,16 @@ impl<P> FieldBuilder<'_, P> {
 
 /// A helper trait to share attribute code between struct and enum generators.
 trait AttributeContainer {
-    fn derives(&mut self) -> &mut Vec<StringOrIdent>;
+    fn derives(&mut self) -> &mut Vec<Path>;
     fn attributes(&mut self) -> &mut Vec<StreamBuilder>;
 
-    fn with_derive(&mut self, derive: impl Into<StringOrIdent>) -> &mut Self {
+    fn with_derive(&mut self, derive: impl Into<Path>) -> &mut Self {
         self.derives().push(derive.into());
         self
     }
 
-    fn with_derives(&mut self, derives: impl IntoIterator<Item = StringOrIdent>) -> &mut Self {
-        self.derives().extend(derives);
+    fn with_derives<T: Into<Path>>(&mut self, derives: impl IntoIterator<Item = T>) -> &mut Self {
+        self.derives().extend(derives.into_iter().map(Into::into));
         self
     }
 
@@ -291,10 +351,16 @@ trait AttributeContainer {
                         if idx > 0 {
                             b.punct(',');
                         }
-                        match derive {
-                            StringOrIdent::String(s) => b.ident_str(s),
-                            StringOrIdent::Ident(i) => b.ident(i),
-                        };
+                        for (idx, component) in derive.into_iter().enumerate() {
+                            if idx > 0 {
+                                b.puncts("::");
+                            }
+
+                            match component {
+                                StringOrIdent::String(s) => b.ident_str(s),
+                                StringOrIdent::Ident(i) => b.ident(i),
+                            };
+                        }
                     }
                     Ok(())
                 })
@@ -313,7 +379,7 @@ trait AttributeContainer {
 }
 
 impl AttributeContainer for Field {
-    fn derives(&mut self) -> &mut Vec<StringOrIdent> {
+    fn derives(&mut self) -> &mut Vec<Path> {
         unreachable!("fields cannot have derives")
     }
 
