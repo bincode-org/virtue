@@ -24,7 +24,7 @@ mod stream_builder;
 use crate::parse::Visibility;
 use crate::{
     parse::{GenericConstraints, Generics},
-    prelude::{Delimiter, Ident},
+    prelude::{Delimiter, Ident, TokenStream},
 };
 use std::fmt;
 use std::marker::PhantomData;
@@ -258,6 +258,33 @@ impl<P> FieldBuilder<'_, P> {
         Ok(self)
     }
 
+    /// Add a token stream as an attribute to the field.
+    ///
+    /// ```
+    /// # use virtue::prelude::{Generator, TokenStream};
+    /// # let mut generator = Generator::with_name("Fooz");
+    /// let attribute = "serde(default)".parse::<TokenStream>().unwrap();
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .add_field("foo", "u16")
+    ///     .make_pub()
+    ///     .with_attribute_stream(attribute);
+    /// # generator.assert_eq("struct Foo { # [serde (default)] pub foo : u16 , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// struct Foo {
+    ///     #[serde(default)]
+    ///     pub bar: u16
+    /// }
+    /// ```
+    pub fn with_attribute_stream(&mut self, attribute: impl Into<TokenStream>) -> &mut Self {
+        self.current().with_attribute_stream(attribute);
+        self
+    }
+
     /// Add a field to the parent type.
     ///
     /// ```
@@ -340,6 +367,14 @@ trait AttributeContainer {
         stream.push_parsed(attribute)?;
         self.attributes().push(stream);
         Ok(self)
+    }
+
+    fn with_attribute_stream(&mut self, attribute: impl Into<TokenStream>) -> &mut Self {
+        let stream = StreamBuilder {
+            stream: attribute.into(),
+        };
+        self.attributes().push(stream);
+        self
     }
 
     fn build_derives(&mut self, b: &mut StreamBuilder) -> &mut Self {

@@ -3,7 +3,7 @@ use super::{
     StringOrIdent,
 };
 use crate::parse::{Generic, Generics, Visibility};
-use crate::prelude::{Delimiter, Ident, Span};
+use crate::prelude::{Delimiter, Ident, Span, TokenStream};
 use crate::Result;
 
 /// Builder to generate a struct.
@@ -275,6 +275,31 @@ impl<'a, P: Parent> GenStruct<'a, P> {
     /// ```
     pub fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> Result<&mut Self> {
         AttributeContainer::with_parsed_attribute(self, attribute)
+    }
+
+    /// Add a token stream as an attribute to the struct. For `#[derive(...)]`, use
+    /// [`with_derive`](Self::with_derive) instead.
+    ///
+    /// ```
+    /// # use virtue::prelude::{Generator, TokenStream};
+    /// # use std::str::FromStr;
+    /// # let mut generator = Generator::with_name("Bar");
+    ///
+    /// let attribute = "serde(rename_all = \"camelCase\")".parse::<TokenStream>().unwrap();
+    /// generator
+    ///     .generate_struct("Foo")
+    ///     .with_attribute_stream(attribute);
+    /// # generator.assert_eq("# [serde (rename_all = \"camelCase\")] struct Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[serde(rename_all = "camelCase")]
+    /// struct Foo { }
+    /// ```
+    pub fn with_attribute_stream(&mut self, attribute: impl Into<TokenStream>) -> &mut Self {
+        AttributeContainer::with_attribute_stream(self, attribute)
     }
 
     /// Add a field to the struct.

@@ -3,7 +3,7 @@ use super::{
     StringOrIdent,
 };
 use crate::parse::{Generic, Generics, Visibility};
-use crate::prelude::{Delimiter, Ident, Span};
+use crate::prelude::{Delimiter, Ident, Span, TokenStream};
 use crate::Result;
 
 /// Builder to generate an `enum <Name> { <value> { ... }, ... }`
@@ -150,6 +150,53 @@ impl<'a, P: Parent> GenEnum<'a, P> {
         value: impl FnOnce(&mut StreamBuilder) -> Result,
     ) -> Result<&mut Self> {
         AttributeContainer::with_attribute(self, name, value)
+    }
+
+    /// Add a parsed attribute to the enum. For `#[derive(...)]`, use [`with_derive`](Self::with_derive)
+    /// instead.
+    ///
+    /// ```
+    /// # use virtue::prelude::Generator;
+    /// # let mut generator = Generator::with_name("Bar");
+    ///
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .with_parsed_attribute("serde(untagged)")?;
+    /// # generator.assert_eq("# [serde (untagged)] enum Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[serde(untagged)]
+    /// enum Foo { }
+    /// ```
+    pub fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> Result<&mut Self> {
+        AttributeContainer::with_parsed_attribute(self, attribute)
+    }
+
+    /// Add a token stream as an attribute to the enum. For `#[derive(...)]`, use
+    /// [`with_derive`](Self::with_derive) instead.
+    ///
+    /// ```
+    /// # use virtue::prelude::{Generator, TokenStream};
+    /// # let mut generator = Generator::with_name("Bar");
+    ///
+    /// let attribute = "serde(untagged)".parse::<TokenStream>().unwrap();
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .with_attribute_stream(attribute);
+    /// # generator.assert_eq("# [serde (untagged)] enum Foo { }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// #[serde(untagged)]
+    /// enum Foo { }
+    /// ```
+    pub fn with_attribute_stream(&mut self, attribute: impl Into<TokenStream>) -> &mut Self {
+        AttributeContainer::with_attribute_stream(self, attribute)
     }
 
     /// Inherit the generic parameters of the parent type.
@@ -452,6 +499,31 @@ impl EnumValue {
     /// ```
     pub fn with_parsed_attribute(&mut self, attribute: impl AsRef<str>) -> Result<&mut Self> {
         AttributeContainer::with_parsed_attribute(self, attribute)
+    }
+
+    /// Add a token stream as an attribute to the variant.
+    ///
+    /// ```
+    /// # use virtue::prelude::{Generator, TokenStream};
+    /// # let mut generator = Generator::with_name("Bar");
+    /// let attribute = "serde(rename_all = \"camelCase\")".parse::<TokenStream>().unwrap();
+    /// generator
+    ///     .generate_enum("Foo")
+    ///     .add_value("Bar")
+    ///     .with_attribute_stream(attribute);
+    /// # generator.assert_eq("enum Foo { # [serde (rename_all = \"camelCase\")] Bar { } , }");
+    /// # Ok::<_, virtue::Error>(())
+    /// ```
+    ///
+    /// Generates:
+    /// ```ignore
+    /// enum Foo {
+    ///     #[serde(rename_all = "camelCase")]
+    ///     Bar { }
+    /// }
+    /// ```
+    pub fn with_attribute_stream(&mut self, attribute: impl Into<TokenStream>) -> &mut Self {
+        AttributeContainer::with_attribute_stream(self, attribute)
     }
 
     /// Add a field to the enum value.
