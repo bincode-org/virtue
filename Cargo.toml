@@ -1,6 +1,6 @@
 [package]
 name = "virtue"
-version = "0.0.16"
+version = "0.0.17"
 edition = "2021"
 description = "A sinless derive macro helper"
 license = "MIT"
