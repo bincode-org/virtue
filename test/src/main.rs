@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 bitflags::bitflags! {
     #[derive(virtue_test_derive::RetHi)]
     pub struct Foo: u8 {
@@ -7,7 +9,7 @@ bitflags::bitflags! {
 }
 
 #[derive(virtue_test_derive::RetHi)]
-pub struct DefaultGeneric<T = ()> {
+pub struct DefaultGeneric<T: Debug = ()> {
     pub t: T,
 }
 
